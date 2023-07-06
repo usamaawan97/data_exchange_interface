@@ -1,0 +1,83 @@
+{
+	"name": "Get_Data_From_BC",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Service Codes",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 5,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT  TOP 2 * FROM dbo.DEX_Site_Config  \nWHERE   SiteCode  LIKE'%US%' OR \n        SiteCode LIKE'%UK%'  ",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "Tab_DEX_Site_Config",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach ServiceCode",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Service Codes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Service Codes').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Get_Data_From_BC_Internal",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Get_Data_From_BC_Internal",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"SiteCode": {
+										"value": "@item().SiteCode",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"folder": {
+			"name": "Ecom"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-08-16T11:13:28Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

@@ -1,0 +1,26 @@
+{
+	"name": "Tab_DEX_Oauth_Access_Token",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "DEXInterfaceProd",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "ID",
+				"type": "bigint",
+				"precision": 19
+			},
+			{
+				"name": "AccessToken",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "DEX_Oauth_Access_Token"
+		}
+	}
+}

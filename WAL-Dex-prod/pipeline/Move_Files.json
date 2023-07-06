@@ -1,0 +1,107 @@
+{
+	"name": "Move_Files",
+	"properties": {
+		"description": "Move files from one folder to another folder",
+		"activities": [
+			{
+				"name": "Copy A File",
+				"description": "Copy a file from the source store to the destination store.",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 5,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "BinarySource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": false,
+							"deleteFilesAfterCompletion": true
+						},
+						"formatSettings": {
+							"type": "BinaryReadSettings"
+						},
+						"recursive": false
+					},
+					"sink": {
+						"type": "BinarySink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						}
+					},
+					"enableStaging": false,
+					"dataIntegrationUnits": 0
+				},
+				"inputs": [
+					{
+						"referenceName": "Storage_Source_Des_File_Blob",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": {
+								"value": "@pipeline().parameters.SourceStore_Location",
+								"type": "Expression"
+							},
+							"Directory": {
+								"value": "@pipeline().parameters.SourceStore_Directory",
+								"type": "Expression"
+							},
+							"filename": {
+								"value": "@pipeline().parameters.FileName",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "Storage_Source_Des_File_Blob",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": {
+								"value": "@pipeline().parameters.DestinationStore_Location",
+								"type": "Expression"
+							},
+							"Directory": {
+								"value": "@pipeline().parameters.DestinationStore_Directory",
+								"type": "Expression"
+							},
+							"filename": {
+								"value": "@pipeline().parameters.FileName",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			}
+		],
+		"parameters": {
+			"SourceStore_Location": {
+				"type": "String"
+			},
+			"SourceStore_Directory": {
+				"type": "String"
+			},
+			"DestinationStore_Location": {
+				"type": "String"
+			},
+			"DestinationStore_Directory": {
+				"type": "String"
+			},
+			"FileName": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "Common Pipelines"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-08-14T16:23:09Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

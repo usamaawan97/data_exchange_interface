@@ -1,0 +1,46 @@
+{
+	"name": "Tab_DEX_Interface_Files",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "DEXInterfaceProd",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "FileID",
+				"type": "bigint",
+				"precision": 19
+			},
+			{
+				"name": "FileName",
+				"type": "nvarchar"
+			},
+			{
+				"name": "IsDownloaded",
+				"type": "bit"
+			},
+			{
+				"name": "IsProcessed",
+				"type": "bit"
+			},
+			{
+				"name": "DownloadedOn",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "ProcessedOn",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "DEX_Interface_Files"
+		}
+	}
+}

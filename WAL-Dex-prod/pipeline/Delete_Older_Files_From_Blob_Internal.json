@@ -1,0 +1,119 @@
+{
+	"name": "Delete_Older_Files_From_Blob_Internal",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Older Files",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 5,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "Storage_Source_Destination_Blob",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": {
+								"value": "@pipeline().parameters.container",
+								"type": "Expression"
+							},
+							"Directory": "/"
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"modifiedDatetimeEnd": {
+							"value": "@adddays(utcnow(),-10)",
+							"type": "Expression"
+						},
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "BinaryReadSettings"
+					}
+				}
+			},
+			{
+				"name": "ForEach File Deletion",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Older Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Older Files').output.childItems",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Delete File",
+							"type": "Delete",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "Storage_Source_Des_File_Blob",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": {
+											"value": "@pipeline().parameters.container",
+											"type": "Expression"
+										},
+										"Directory": {
+											"value": "/",
+											"type": "Expression"
+										},
+										"filename": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
+									}
+								},
+								"enableLogging": false,
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"container": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "Ecom"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-08-20T06:36:12Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

@@ -1,0 +1,144 @@
+{
+	"name": "Master_Process_Rec_Internal",
+	"properties": {
+		"activities": [
+			{
+				"name": "Save_Rec_Data_To_DB",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Get_Rec_Data_From_IOP_FTP",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Save_Rec_Data_To_DB",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Get_Rec_Data_From_Byoma_FTP",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Get_Rec_Data_From_Tanologist_FTP",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Get_Rec_Data_From_Byoma_FTP",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Send_Rec_File_To_BS",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Save_Rec_Data_To_DB",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Send_Rec_File_To_BS",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Upload_Rec_File_To_WC",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Send_Rec_File_To_BS",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Upload_Rec_File_To_WC",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Get_Rec_Data_From_Tanologist_FTP",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Get_Rec_Data_From_Tanologist_FTP",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Get_Rec_Data_From_Tanluxe_FTP",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Get_Rec_Data_From_Byoma_FTP",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Get_Rec_Data_From_Tanluxe_FTP",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Get_Rec_Data_From_IOP_FTP",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Get_Rec_Data_From_Tanluxe_FTP",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Get_Rec_Data_From_IOP_FTP",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			}
+		],
+		"folder": {
+			"name": "Reconciliation"
+		},
+		"annotations": []
+	}
+}

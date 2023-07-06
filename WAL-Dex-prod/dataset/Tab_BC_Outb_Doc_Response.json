@@ -1,0 +1,44 @@
+{
+	"name": "Tab_BC_Outb_Doc_Response",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "DEXInterfaceProd",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "ID",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "BCMessageID",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "MessageType",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Direction",
+				"type": "nvarchar"
+			},
+			{
+				"name": "PayLoad",
+				"type": "xml"
+			},
+			{
+				"name": "SiteCode",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "BC_Outbound_Document_Response"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

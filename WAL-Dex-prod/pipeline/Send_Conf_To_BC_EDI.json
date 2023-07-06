@@ -1,0 +1,313 @@
+{
+	"name": "Send_Conf_To_BC_EDI",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Interface Docs For BC",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT  [MessageID]\n\t , [Direction]\n      ,[SiteCode]\n      ,[MessageDate]\n      ,[MessageType]\n      ,[CreatedOn]\n      ,[Exported]\n      ,[ExportedOn]\n      ,[LastUpdatedOn]\n      ,[FileData]\n      ,[FileName]\n      ,[BCMessageID]\n  FROM [dbo].[DEX_Interface_Document]\n  WHERE Exported =  0\n\t\tAND InterfaceCode IN ('IBEDISC')",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "Tab_BC_Inb_Docs",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "For Each Document",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Interface Docs For BC",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Interface Docs For BC').output.value\n",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Get Service Config",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[dbo].[Get_Service_Configuration_EDI]",
+									"storedProcedureParameters": {
+										"ServiceCode": {
+											"type": "String",
+											"value": {
+												"value": "@pipeline().parameters.ServiceCode",
+												"type": "Expression"
+											}
+										},
+										"SiteCode": {
+											"type": "String",
+											"value": {
+												"value": "@item().SiteCode",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "Tab_BC_Inb_Docs",
+									"type": "DatasetReference"
+								}
+							}
+						},
+						{
+							"name": "Mark Document Exported",
+							"type": "Lookup",
+							"dependsOn": [
+								{
+									"activity": "Send Document To BC_EDI",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[dbo].[Update_Exported_Message]",
+									"storedProcedureParameters": {
+										"MessageID": {
+											"type": "Int32",
+											"value": {
+												"value": "@item().MessageID",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "Tab_BC_Inb_Docs",
+									"type": "DatasetReference"
+								}
+							}
+						},
+						{
+							"name": "Update Interface Documents",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Mark Document Exported",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[Update_BC_Message ID_From_Response]"
+							},
+							"linkedServiceName": {
+								"referenceName": "DEXInterfaceProd",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Send Document To BC_EDI",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Get_Access_Token_DB_EDI",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "Source",
+									"value": "v2.0/ac636b3d-2eb0-41e7-b5a6-7e15645731e9/SandboxDev/WS/We%20Are%20Luxe%20-%20Live/Codeunit/MessageMgmt"
+								},
+								{
+									"name": "Destination",
+									"value": "drop//"
+								}
+							],
+							"typeProperties": {
+								"source": {
+									"type": "XmlSource",
+									"storeSettings": {
+										"type": "HttpReadSettings",
+										"requestMethod": "POST",
+										"additionalHeaders": {
+											"value": "Authorization:Bearer @{activity('Get_Access_Token_DB_EDI').output.firstRow.AccessTokenEDI}\nContent-Type:@{activity('Get Service Config').output.firstRow.ContentType}\nsoapAction:@{activity('Get Service Config').output.firstRow.SoapAction}",
+											"type": "Expression"
+										},
+										"requestBody": {
+											"value": "@{concat('<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n    <soap:Body>\n        <CreateMessage xmlns=\"urn:microsoft-dynamics-schemas/codeunit/MessageMgmt\">\n            <xMLData>\n                <MessageAcknowledgement xmlns=\"urn:microsoft-dynamics-nav/xmlports/x52000\">\n                    <Id/>\n                    <MessageType>',\n\n            item().MessageType \n,'</MessageType>\n                    <Direction>Inbound</Direction>\n                    <Payload>\n                        <![CDATA[ ',\n\n            item().FileData \n,'\n                           ]]>\n\t\t\t\t\t\n                    </Payload>\n                    <Status>Unprocessed</Status>\n                    <ExternalRefID>\n                    <![CDATA[ ',\n\n            item().MessageID\n,'\n                           ]]> \n                   </ExternalRefID>\n                  <SiteCode>\n                  <![CDATA[ ',\n\n            item().SiteCode\n,'\n                           ]]> \n               </SiteCode>\n                </MessageAcknowledgement>\n            </xMLData>\n        </CreateMessage>\n    </soap:Body>\n</soap:Envelope>')}",
+											"type": "Expression"
+										},
+										"requestTimeout": ""
+									},
+									"formatSettings": {
+										"type": "XmlReadSettings",
+										"validationMode": "none",
+										"detectDataType": true,
+										"namespaces": false
+									}
+								},
+								"sink": {
+									"type": "AzureSqlSink",
+									"writeBehavior": "insert"
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"mappings": [
+										{
+											"source": {
+												"path": "$['Soap:Envelope']['Soap:Body']['CreateMessage_Result']['xMLData']['MessageAcknowledgement']['Id']"
+											},
+											"sink": {
+												"name": "BCMessageID",
+												"type": "Int32"
+											}
+										},
+										{
+											"source": {
+												"path": "$['Soap:Envelope']['Soap:Body']['CreateMessage_Result']['xMLData']['MessageAcknowledgement']['ExternalRefID']"
+											},
+											"sink": {
+												"name": "MessageID",
+												"type": "Int32"
+											}
+										}
+									],
+									"collectionReference": ""
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "Http_BC_WebService",
+									"type": "DatasetReference",
+									"parameters": {
+										"RelUrl": {
+											"value": "@activity('Get Service Config').output.firstRow.RelativeURL",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "Tab_DEX_Interface_Docs_Response",
+									"type": "DatasetReference"
+								}
+							]
+						},
+						{
+							"name": "Get_Access_Token_DB_EDI",
+							"type": "Lookup",
+							"dependsOn": [
+								{
+									"activity": "Get Service Config",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "SELECT * FROM DEX_Oauth_Access_Token",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "Tab_DEX_Oauth_Access_Token",
+									"type": "DatasetReference"
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"ServiceCode": {
+				"type": "string",
+				"defaultValue": "CreateMessage"
+			}
+		},
+		"folder": {
+			"name": "EDI Confirmations"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-08-27T05:03:03Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

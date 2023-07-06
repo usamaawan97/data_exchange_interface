@@ -1,0 +1,122 @@
+{
+	"name": "Save_Rec_Data_To_DB_Internal",
+	"properties": {
+		"activities": [
+			{
+				"name": "ForEach Matched Orders",
+				"type": "ForEach",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@pipeline().parameters.MatchedOrdersArray",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Get Matched Orders XML",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[dbo].[Get_Matched_Recon_Shipments]",
+									"storedProcedureParameters": {
+										"DexInterfaceDocMID": {
+											"type": "Int32",
+											"value": {
+												"value": "@item().DexInterfaceDocMID",
+												"type": "Expression"
+											}
+										},
+										"OrderNo": {
+											"type": "String",
+											"value": {
+												"value": "@item().Order_Number",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "Tab_DEX_Rec_Interface_Document",
+									"type": "DatasetReference"
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "Update_Dex_Rec_Interface_Document",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Get Matched Orders XML",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[Update_Dex_Rec_Interface_Document]",
+								"storedProcedureParameters": {
+									"Order_Number": {
+										"value": {
+											"value": "@item().Order_Number",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"ReconXML": {
+										"value": {
+											"value": "@activity('Get Matched Orders XML').output.firstRow.ReconXML",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"SiteCode": {
+										"value": {
+											"value": "@item().SiteCode",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "DEXInterfaceProd",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"MatchedOrdersArray": {
+				"type": "array"
+			}
+		},
+		"folder": {
+			"name": "Reconciliation"
+		},
+		"annotations": []
+	}
+}

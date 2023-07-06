@@ -1,0 +1,59 @@
+{
+	"name": "Tab_DEX_Interface",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "DEXInterfaceProd",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "InterfaceCode",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Name",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Enabled",
+				"type": "bit"
+			},
+			{
+				"name": "CopyToOutboundFolder",
+				"type": "bit"
+			},
+			{
+				"name": "CopyToOutboundInterfaceID",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "Type",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Action",
+				"type": "nvarchar"
+			},
+			{
+				"name": "FTPConfig",
+				"type": "nvarchar"
+			},
+			{
+				"name": "FTPDropDir",
+				"type": "nvarchar"
+			},
+			{
+				"name": "FTPProcessedDir",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "DEX_Interface"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

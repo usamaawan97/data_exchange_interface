@@ -1,0 +1,163 @@
+{
+	"name": "Master_Process_Data_Internal",
+	"properties": {
+		"activities": [
+			{
+				"name": "Update_BC_Message_Queue",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Get_data_From_BC",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Update_BC_Message_Queue",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Get_data_From_BC",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Send_Data_To_BC",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Get_Data_From_BC",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Send_Data_To_BC",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Get_Data_From_Byoma_FTP",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get_Data_From_Tanologist_FTP",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get_Data_From_Tanluxe_FTP",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get_Data_From_IOP_FTP",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Send_Data_To_BC",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Get_Data_From_Byoma_FTP",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Get_Data_From_Byoma_FTP",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Send_Data_To_WC",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Update_BC_Message_Queue",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Send_Data_To_WC",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Get_Data_From_Tanologist_FTP",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Get_Data_From_Tanologist_FTP",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Get_Data_From_Tanluxe_FTP",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Get_Data_From_Tanluxe_FTP",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Get_Data_From_IOP_FTP",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Get_Data_From_IOP_FTP",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			}
+		],
+		"folder": {
+			"name": "Ecom"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-08-27T04:53:26Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

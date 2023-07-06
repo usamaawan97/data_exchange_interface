@@ -1,0 +1,230 @@
+{
+	"name": "Send_Data_To_WC_ILG_Internal",
+	"properties": {
+		"activities": [
+			{
+				"name": "For Each Outbound Document",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Outbound Documents",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Outbound Documents').output.value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Update Exported Messages",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Export Message to BS_SO",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[Update_Exported_Message]",
+								"storedProcedureParameters": {
+									"MessageID": {
+										"value": {
+											"value": "@item().MessageID",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "DEXInterfaceProd",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Export Message to BS_SO",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "Source",
+									"value": "dbo.BC_Inbound_Documents"
+								},
+								{
+									"name": "Destination",
+									"value": "obdrop//@{\nreplace(\nconcat(item().SiteCode,'_',item().MessageType,'_',formatDateTime(utcNow(),'yyyyMMddhhmmss')),' ','')\n\n}.xml\n"
+								}
+							],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[dbo].[Get_OutBound_Msg_Detail_Csv]",
+									"storedProcedureParameters": {
+										"MessageID": {
+											"type": "Int32",
+											"value": {
+												"value": "@item().MessageID",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"mappings": [
+										{
+											"source": {
+												"name": "FileDataCsv",
+												"type": "String",
+												"physicalType": "nvarchar"
+											},
+											"sink": {
+												"type": "String",
+												"physicalType": "String",
+												"ordinal": 1
+											}
+										}
+									],
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "Tab_BC_Inb_Docs",
+									"type": "DatasetReference"
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "Storage_Save_OB_File_In_Blob_CSV",
+									"type": "DatasetReference",
+									"parameters": {
+										"SiteCode": {
+											"value": "@item().SiteCode",
+											"type": "Expression"
+										},
+										"MessageType": {
+											"value": "@item().MessageType",
+											"type": "Expression"
+										},
+										"MessageId": {
+											"value": "@item().MessageID",
+											"type": "Expression"
+										},
+										"container": "obdrop"
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "Get Outbound Documents",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT TOP 1000\n\t\tMessageID, SiteCode, MessageType, FileDataCsv,InterfaceCode\n\tFROM \n\t\tDEX_Interface_Document \n\tWHERE \n\t\tDirection = 'Outbound'  and Exported = 0 and InterfaceCode= '@{pipeline().parameters.InterfaceCode}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "Tab_Dex_Interface_Document",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Upload_Files_To_WC_ILG",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "For Each Outbound Document",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Upload_Files_To_WC_ILG",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"Interface_Code": {
+							"value": "@pipeline().parameters.InterfaceCode",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"InterfaceCode": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ILG Confirmations"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-08-26T15:43:54Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

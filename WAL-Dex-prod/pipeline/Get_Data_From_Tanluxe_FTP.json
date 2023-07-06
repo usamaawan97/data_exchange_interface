@@ -1,0 +1,1042 @@
+{
+	"name": "Get_Data_From_Tanluxe_FTP",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Interface Info IBWCSO",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 5,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT DI.InterfaceCode, DI.[Enabled], DI.[Type], DI.[Direction], DI.[FTPDropDir], DI.FTPProcessedDir \nFROM dbo.DEX_Interface DI\nWHERE InterfaceCode = 'IBWCSO'\n",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "Tab_DEX_Interface",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "GET WC Order Files",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "Get Interface Info IBWCSO",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 5,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "Tanluxe_WC_SFTP",
+						"type": "DatasetReference",
+						"parameters": {
+							"FolderName": {
+								"value": "@activity('Get Interface Info IBWCSO').output.value[0].FTPDropDir",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "SftpReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "BinaryReadSettings"
+					}
+				}
+			},
+			{
+				"name": "For Each Order File",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GET WC Order Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('GET WC Order Files').output.childItems",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Load_Interface_Files_From_WC",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[dbo].[Load_Interface_Files_From_WC]",
+									"storedProcedureParameters": {
+										"FileName": {
+											"type": "String",
+											"value": {
+												"value": "@item().name",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "Tab_DEX_Interface_Files",
+									"type": "DatasetReference"
+								}
+							}
+						},
+						{
+							"name": "Copy WC Order File to Azure Blob",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Load_Interface_Files_From_WC",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "Source",
+									"value": "/wc/Outbound/Drop/"
+								},
+								{
+									"name": "Destination",
+									"value": "drop//"
+								}
+							],
+							"typeProperties": {
+								"source": {
+									"type": "BinarySource",
+									"storeSettings": {
+										"type": "SftpReadSettings",
+										"recursive": false,
+										"deleteFilesAfterCompletion": false
+									},
+									"formatSettings": {
+										"type": "BinaryReadSettings"
+									}
+								},
+								"sink": {
+									"type": "BinarySink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "Tanluxe_WC_SFTP_Connection_With_FileName",
+									"type": "DatasetReference",
+									"parameters": {
+										"FolderName": {
+											"value": "@activity('Get Interface Info IBWCSO').output.value[0].FTPDropDir",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "Storage_IB_Drop_Folder_Blob",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": "/",
+										"Directory": "ibdrop",
+										"filename": "*"
+									}
+								}
+							]
+						},
+						{
+							"name": "Update_Downloaded_File_From_WC",
+							"description": "Update Downloaded File From WC in Interface Files Table",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Copy WC Order File to Azure Blob",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[Update_Downloaded_File_From_WC]",
+								"storedProcedureParameters": {
+									"FileID": {
+										"value": {
+											"value": "@activity('Load_Interface_Files_From_WC').output.firstRow.NewFileID",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "DEXInterfaceProd",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Move_Files_To_InProcess_In_Blob",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "Update_Downloaded_File_From_WC",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Move_Files",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"SourceStore_Location": "/",
+									"SourceStore_Directory": "ibdrop",
+									"DestinationStore_Location": "/",
+									"DestinationStore_Directory": "ibinprocess",
+									"FileName": {
+										"value": "@item().name",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Load In Process File From Blob to Azure SQL",
+							"description": "Load In Process File From Blob to Azure SQL (Interface document table)",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Move_Files_To_InProcess_In_Blob",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[Load_InProcess_Files_From_BS]",
+								"storedProcedureParameters": {
+									"ContainerName": {
+										"value": "ibinprocess",
+										"type": "String"
+									},
+									"DataSource": {
+										"value": "AzureStorage",
+										"type": "String"
+									},
+									"Direction": {
+										"value": "Inbound",
+										"type": "String"
+									},
+									"FileName": {
+										"value": {
+											"value": "@item().name",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "DEXInterfaceProd",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Move_Files_To_Processed_In_Blob",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "Load In Process File From Blob to Azure SQL",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Move_Files",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"SourceStore_Location": "/",
+									"SourceStore_Directory": "ibinprocess",
+									"DestinationStore_Location": "/",
+									"DestinationStore_Directory": "ibprocessed",
+									"FileName": {
+										"value": "@item().name",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Update_Processed_File_From_WC",
+							"description": "Update Processed File From WC in Interface Files Table",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Move_Files_To_Processed_In_Blob",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[Update_Processed_File_From_WC]",
+								"storedProcedureParameters": {
+									"FileID": {
+										"value": {
+											"value": "@activity('Load_Interface_Files_From_WC').output.firstRow.NewFileID",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "DEXInterfaceProd",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "SFTP Move WC Orders to Processed",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Update_Processed_File_From_WC",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "Source",
+									"value": "/wc/Outbound/Drop/"
+								},
+								{
+									"name": "Destination",
+									"value": "drop//"
+								}
+							],
+							"typeProperties": {
+								"source": {
+									"type": "BinarySource",
+									"storeSettings": {
+										"type": "SftpReadSettings",
+										"recursive": false,
+										"deleteFilesAfterCompletion": false
+									},
+									"formatSettings": {
+										"type": "BinaryReadSettings"
+									}
+								},
+								"sink": {
+									"type": "BinarySink",
+									"storeSettings": {
+										"type": "SftpWriteSettings",
+										"operationTimeout": "01:00:00",
+										"useTempFileRename": true
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "Tanluxe_WC_SFTP_Connection_With_FileName",
+									"type": "DatasetReference",
+									"parameters": {
+										"FolderName": {
+											"value": "@activity('Get Interface Info IBWCSO').output.value[0].FTPDropDir",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "Tanluxe_WC_SFTP_Connection_With_FileName",
+									"type": "DatasetReference",
+									"parameters": {
+										"FolderName": {
+											"value": "@activity('Get Interface Info IBWCSO').output.value[0].FTPProcessedDir",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Delete Orders File From OBDrop",
+							"type": "Delete",
+							"dependsOn": [
+								{
+									"activity": "SFTP Move WC Orders to Processed",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "Tanluxe_WC_SFTP_Connection_With_FileName",
+									"type": "DatasetReference",
+									"parameters": {
+										"FolderName": {
+											"value": "@activity('Get Interface Info IBWCSO').output.value[0].FTPDropDir",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
+									}
+								},
+								"enableLogging": false,
+								"storeSettings": {
+									"type": "SftpReadSettings",
+									"recursive": false,
+									"enablePartitionDiscovery": false
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get Interface Info IBPDRSHIP",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "For Each Order File",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 5,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT DI.InterfaceCode, DI.[Enabled], DI.[Type], DI.[Direction], DI.[FTPDropDir], DI.FTPProcessedDir \nFROM dbo.DEX_Interface DI\nWHERE InterfaceCode = 'IBPDRSHIP'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "Tab_DEX_Interface",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Get WC Shipment Files",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "Get Interface Info IBPDRSHIP",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 5,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "Tanluxe_WC_SFTP",
+						"type": "DatasetReference",
+						"parameters": {
+							"FolderName": {
+								"value": "@activity('Get Interface Info IBPDRSHIP').output.value[0].FTPDropDir",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "SftpReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "BinaryReadSettings"
+					}
+				}
+			},
+			{
+				"name": "For Each Shipment File",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get WC Shipment Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get WC Shipment Files').output.childItems",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Load_Shipment_Interface_Files_From_WC",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[dbo].[Load_Interface_Files_From_WC]",
+									"storedProcedureParameters": {
+										"FileName": {
+											"type": "String",
+											"value": {
+												"value": "@item().name",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "Tab_DEX_Interface_Files",
+									"type": "DatasetReference"
+								}
+							}
+						},
+						{
+							"name": "Copy WC ShipmentFile to Azure Blob",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Load_Shipment_Interface_Files_From_WC",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "Source",
+									"value": "/wc/Outbound/Drop/"
+								},
+								{
+									"name": "Destination",
+									"value": "drop//"
+								}
+							],
+							"typeProperties": {
+								"source": {
+									"type": "BinarySource",
+									"storeSettings": {
+										"type": "SftpReadSettings",
+										"recursive": false,
+										"deleteFilesAfterCompletion": false
+									},
+									"formatSettings": {
+										"type": "BinaryReadSettings"
+									}
+								},
+								"sink": {
+									"type": "BinarySink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "Tanluxe_WC_SFTP_Connection_With_FileName",
+									"type": "DatasetReference",
+									"parameters": {
+										"FolderName": {
+											"value": "@activity('Get Interface Info IBPDRSHIP').output.value[0].FtpDropDir",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "Storage_IB_Drop_Folder_Blob",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": "/",
+										"Directory": "ibdrop",
+										"filename": "*"
+									}
+								}
+							]
+						},
+						{
+							"name": "Update_Downloaded_Shipment_File_From_WC",
+							"description": "Update Downloaded File From WC in Interface Files Table",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Copy WC ShipmentFile to Azure Blob",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[Update_Downloaded_File_From_WC]",
+								"storedProcedureParameters": {
+									"FileID": {
+										"value": {
+											"value": "@activity('Load_Shipment_Interface_Files_From_WC').output.firstRow.NewFileID",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "DEXInterfaceProd",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Move_Shipment_Files_To_InProcess_In_Blob",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "Update_Downloaded_Shipment_File_From_WC",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Move_Files",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"SourceStore_Location": "/",
+									"SourceStore_Directory": "ibdrop",
+									"DestinationStore_Location": "/",
+									"DestinationStore_Directory": "ibinprocess",
+									"FileName": {
+										"value": "@item().name",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Load In Process Ship File From Blob to Azure SQL_copy1",
+							"description": "Load In Process File From Blob to Azure SQL (Interface document table)",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Move_Shipment_Files_To_InProcess_In_Blob",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[Load_InProcess_Files_From_BS]",
+								"storedProcedureParameters": {
+									"ContainerName": {
+										"value": "ibinprocess",
+										"type": "String"
+									},
+									"DataSource": {
+										"value": "AzureStorage",
+										"type": "String"
+									},
+									"Direction": {
+										"value": "Inbound",
+										"type": "String"
+									},
+									"FileName": {
+										"value": {
+											"value": "@item().name",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "DEXInterfaceProd",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Move_Shipment_Files_To_Processed_In_Blob",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "Load In Process Ship File From Blob to Azure SQL_copy1",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Move_Files",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"SourceStore_Location": "/",
+									"SourceStore_Directory": "ibinprocess",
+									"DestinationStore_Location": "/",
+									"DestinationStore_Directory": "ibprocessed",
+									"FileName": {
+										"value": "@item().name",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Update_Processed_Shipment_File_From_WC",
+							"description": "Update Processed File From WC in Interface Files Table",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Move_Shipment_Files_To_Processed_In_Blob",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[Update_Processed_File_From_WC]",
+								"storedProcedureParameters": {
+									"FileID": {
+										"value": {
+											"value": "@activity('Load_Shipment_Interface_Files_From_WC').output.firstRow.NewFileID",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "DEXInterfaceProd",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "SFTP Move WC Shipment to Processed",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Update_Processed_Shipment_File_From_WC",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [
+								{
+									"name": "Source",
+									"value": "/wc/Outbound/Drop/"
+								},
+								{
+									"name": "Destination",
+									"value": "drop//"
+								}
+							],
+							"typeProperties": {
+								"source": {
+									"type": "BinarySource",
+									"storeSettings": {
+										"type": "SftpReadSettings",
+										"recursive": false,
+										"deleteFilesAfterCompletion": false
+									},
+									"formatSettings": {
+										"type": "BinaryReadSettings"
+									}
+								},
+								"sink": {
+									"type": "BinarySink",
+									"storeSettings": {
+										"type": "SftpWriteSettings",
+										"operationTimeout": "01:00:00",
+										"useTempFileRename": true
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "Tanluxe_WC_SFTP_Connection_With_FileName",
+									"type": "DatasetReference",
+									"parameters": {
+										"FolderName": {
+											"value": "@activity('Get Interface Info IBPDRSHIP').output.value[0].FtpDropDir",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "Tanluxe_WC_SFTP_Connection_With_FileName",
+									"type": "DatasetReference",
+									"parameters": {
+										"FolderName": {
+											"value": "@activity('Get Interface Info IBPDRSHIP').output.value[0].FTPProcessedDir",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Delete Shipment File From OBDrop",
+							"type": "Delete",
+							"dependsOn": [
+								{
+									"activity": "SFTP Move WC Shipment to Processed",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "Tanluxe_WC_SFTP_Connection_With_FileName",
+									"type": "DatasetReference",
+									"parameters": {
+										"FolderName": {
+											"value": "@activity('Get Interface Info IBPDRSHIP').output.value[0].FTPDropDir",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
+									}
+								},
+								"enableLogging": false,
+								"storeSettings": {
+									"type": "SftpReadSettings",
+									"recursive": false,
+									"enablePartitionDiscovery": false
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"folder": {
+			"name": "Ecom"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,722 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adfDEXProd"
+		},
+		"Http_BC_Service_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://api.businesscentral.dynamics.com/"
+		},
+		"kvDEXProd_properties_typeProperties_baseUrl": {
+			"type": "string",
+			"defaultValue": "https://kvDEXProd.vault.azure.net/"
+		},
+		"Byoma_SFTP_properties_typeProperties_host": {
+			"type": "string",
+			"defaultValue": "byomalivems.sftp.wpengine.com"
+		},
+		"Byoma_SFTP_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "byomalivems-elation"
+		},
+		"DEXInterfaceProd_properties_typeProperties_connectionString_secretName": {
+			"type": "string",
+			"defaultValue": "SQL-Database-Connection-String"
+		},
+		"IOP_Sftp_properties_typeProperties_host": {
+			"type": "string",
+			"defaultValue": "isleofparadise.sftp.wpengine.com"
+		},
+		"IOP_Sftp_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "isleofparadise-elation"
+		},
+		"SftpWpEngine_properties_typeProperties_host": {
+			"type": "string",
+			"defaultValue": "futurebeauty.sftp.wpengine.com"
+		},
+		"SftpWpEngine_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "futurebeauty-elation"
+		},
+		"Tanluxe_Sftp_properties_typeProperties_host": {
+			"type": "string",
+			"defaultValue": "tanluxe.sftp.wpengine.com"
+		},
+		"Tanluxe_Sftp_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "tanluxe-elation"
+		},
+		"sadexprod_properties_typeProperties_connectionString_secretName": {
+			"type": "string",
+			"defaultValue": "Storage-Account-Connection-String"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/Http_BC_Service')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "HttpServer",
+				"typeProperties": {
+					"url": "[parameters('Http_BC_Service_properties_typeProperties_url')]",
+					"enableServerCertificateValidation": true,
+					"authenticationType": "Anonymous"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/kvDEXProd')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureKeyVault",
+				"typeProperties": {
+					"baseUrl": "[parameters('kvDEXProd_properties_typeProperties_baseUrl')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Http_BC_WebService')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "Http_BC_Service",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"RelUrl": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Xml",
+				"typeProperties": {
+					"location": {
+						"type": "HttpServerLocation",
+						"relativeUrl": {
+							"value": "@dataset().RelUrl",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/Http_BC_Service')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Byoma_SFTP')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "Sftp",
+				"typeProperties": {
+					"host": "[parameters('Byoma_SFTP_properties_typeProperties_host')]",
+					"port": "2222",
+					"skipHostKeyValidation": true,
+					"authenticationType": "Basic",
+					"userName": "[parameters('Byoma_SFTP_properties_typeProperties_userName')]",
+					"password": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "kvDEXProd",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "Byoma-SFTP-Password"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/kvDEXProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DEXInterfaceProd')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"connectionString": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "kvDEXProd",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "[parameters('DEXInterfaceProd_properties_typeProperties_connectionString_secretName')]"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/kvDEXProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/IOP_Sftp')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "Sftp",
+				"typeProperties": {
+					"host": "[parameters('IOP_Sftp_properties_typeProperties_host')]",
+					"port": "2222",
+					"skipHostKeyValidation": true,
+					"authenticationType": "Basic",
+					"userName": "[parameters('IOP_Sftp_properties_typeProperties_userName')]",
+					"password": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "kvDEXProd",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "IOP-SFTP-Password"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/kvDEXProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SftpWpEngine')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "Sftp",
+				"typeProperties": {
+					"host": "[parameters('SftpWpEngine_properties_typeProperties_host')]",
+					"port": "2222",
+					"skipHostKeyValidation": true,
+					"authenticationType": "Basic",
+					"userName": "[parameters('SftpWpEngine_properties_typeProperties_userName')]",
+					"password": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "kvDEXProd",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "WC-SFTP-Password"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/kvDEXProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Tanluxe_Sftp')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "Sftp",
+				"typeProperties": {
+					"host": "[parameters('Tanluxe_Sftp_properties_typeProperties_host')]",
+					"port": "2222",
+					"skipHostKeyValidation": true,
+					"authenticationType": "Basic",
+					"userName": "[parameters('Tanluxe_Sftp_properties_typeProperties_userName')]",
+					"password": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "kvDEXProd",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "Tanluxe-SFTP-Password"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/kvDEXProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/sadexprod')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobStorage",
+				"typeProperties": {
+					"connectionString": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "kvDEXProd",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "[parameters('sadexprod_properties_typeProperties_connectionString_secretName')]"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/kvDEXProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Byoma_SFTP')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "Byoma_SFTP",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"FolderName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "SftpLocation",
+						"folderPath": {
+							"value": "@dataset().FolderName",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/Byoma_SFTP')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Byoma_SFTP_Connection_With_FileName')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "Byoma_SFTP",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"FolderName": {
+						"type": "string"
+					},
+					"FileName": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "SftpLocation",
+						"fileName": {
+							"value": "@dataset().FileName",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().FolderName",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/Byoma_SFTP')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/IOP_WC_SFTP')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "IOP_Sftp",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"FolderName": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "SftpLocation",
+						"folderPath": {
+							"value": "@dataset().FolderName",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/IOP_Sftp')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/IOP_WC_SFTP_Connection_With_FileName')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "IOP_Sftp",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"FolderName": {
+						"type": "string"
+					},
+					"FileName": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "SftpLocation",
+						"fileName": {
+							"value": "@dataset().FileName",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().FolderName",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/IOP_Sftp')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Storage_CSV_Source_With_Filename')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "sadexprod",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Container": {
+						"type": "String"
+					},
+					"File": {
+						"type": "String"
+					},
+					"Directory": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@dataset().File",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().Directory",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@dataset().Container",
+							"type": "Expression"
+						}
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/sadexprod')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Storage_IB_Drop_Folder_Blob')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "sadexprod",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Container": {
+						"type": "string",
+						"defaultValue": "/"
+					},
+					"Directory": {
+						"type": "string",
+						"defaultValue": "drop"
+					},
+					"filename": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"folderPath": {
+							"value": "@dataset().Directory",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@dataset().Container",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/sadexprod')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Storage_IB_InProcess_Folder_Blob')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "It describes the destination store.",
+				"linkedServiceName": {
+					"referenceName": "sadexprod",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Container": {
+						"type": "String",
+						"defaultValue": "/"
+					},
+					"Directory": {
+						"type": "String",
+						"defaultValue": "inprocess"
+					},
+					"filename": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"folderPath": {
+							"value": "@{dataset().Directory}",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@{dataset().Container}",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/sadexprod')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Storage_IB_Rec_Drop_Folder')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "sadexprod",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Container": {
+						"type": "String"
+					},
+					"Directory": {
+						"type": "String"
+					},
+					"File": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "Xml",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@dataset().File",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().Directory",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@dataset().Container",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/sadexprod')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Storage_Json_with_Directory')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "sadexprod",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Container": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"container": {
+							"value": "@dataset().Container",
+							"type": "Expression"
+						}
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/sadexprod')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Storage_Save_OB_File_In_Blob')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "sadexprod",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"SiteCode": {
+						"type": "string"
+					},
+					"MessageType": {
+						"type": "string"
+					},
+					"MessageId": {
+						"type": "String"
+					},
+					"Container": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@{concat(dataset().SiteCode,'_',dataset().MessageType,'_',dataset().MessageId,'-',formatDateTime(utcNow(),'yyyyMMddhhmmss'))}.xml",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@dataset().Container",
+							"type": "Expression"
+						}
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "",
+					"quoteChar": ""
+				},
+				"schema": [
+					{
+						"type": "String"
+					}
+				]
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/sadexprod')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Storage_Save_OB_File_In_Blob_CSV')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "sadexprod",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"SiteCode": {
+						"type": "string"
+					},
+					"MessageType": {
+						"type": "string"
+					},
+					"MessageId": {
+						"type": "String"
+					},
+					"container": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@{concat(dataset().SiteCode,'_',dataset().MessageType,'_',dataset().MessageId,'-',formatDateTime(utcNow(),'yyyyMMddhhmmss'))}.csv",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@dataset().container",
+							"type": "Expression"
+						}
+					},
+					"columnDelimiter": ",",
+					"rowDelimiter": "\n",
+					"encodingName": "ISO-8859-15",
+					"escapeChar": "",
+					"firstRowAsHeader": false,
+					"quoteChar": ""
+				},
+				"schema": [
+					{
+						"type": "String"
+					}
+				]
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/sadexprod')]"
+			]
+		}
+	]
+}

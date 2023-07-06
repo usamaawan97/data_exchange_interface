@@ -1,0 +1,97 @@
+{
+	"name": "Master_Cycle_ILG_Internal",
+	"properties": {
+		"activities": [
+			{
+				"name": "Send_Data_To_WC_ILG",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Update_ILG_BC_Message_Queue",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Send_Data_To_WC_ILG",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Update_ILG_BC_Message_Queue",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Get_Conf_Data_From_BC_ILG",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Update_ILG_BC_Message_Queue",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Get_Conf_From_ILG_FTP",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Get_Conf_From_ILG_FTP",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Send_Conf_To_BC_ILG",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Get_Conf_From_ILG_FTP",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Send_Conf_To_BC_ILG",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Get_Conf_Data_From_BC_ILG",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Get_Conf_Data_From_BC_ILG",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			}
+		],
+		"folder": {
+			"name": "ILG Confirmations"
+		},
+		"annotations": []
+	}
+}

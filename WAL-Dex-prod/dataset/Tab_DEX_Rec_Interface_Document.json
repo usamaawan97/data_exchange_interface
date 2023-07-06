@@ -1,0 +1,16 @@
+{
+	"name": "Tab_DEX_Rec_Interface_Document",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "DEXInterfaceProd",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "DEX_Rec_Interface_Document"
+		}
+	}
+}

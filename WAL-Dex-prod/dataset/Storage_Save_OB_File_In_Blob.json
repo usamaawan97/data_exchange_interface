@@ -1,0 +1,47 @@
+{
+	"name": "Storage_Save_OB_File_In_Blob",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "sadexprod",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"SiteCode": {
+				"type": "string"
+			},
+			"MessageType": {
+				"type": "string"
+			},
+			"MessageId": {
+				"type": "String"
+			},
+			"Container": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"fileName": {
+					"value": "@{concat(dataset().SiteCode,'_',dataset().MessageType,'_',dataset().MessageId,'-',formatDateTime(utcNow(),'yyyyMMddhhmmss'))}.xml",
+					"type": "Expression"
+				},
+				"container": {
+					"value": "@dataset().Container",
+					"type": "Expression"
+				}
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "",
+			"quoteChar": ""
+		},
+		"schema": [
+			{
+				"type": "String"
+			}
+		]
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

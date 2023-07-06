@@ -1,0 +1,104 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adfDEXProd"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/Master_Process_Data')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Send Failure Email",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Master_Process_Data_Internal",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://prod-26.uksouth.logic.azure.com:443/workflows/660cbc90a51a40dab53e76f370f74e70/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=rslDaEeWOQuFduFl-Q7zq0CcPvzeZBaVvKrOXGfeAak",
+								"type": "Expression"
+							},
+							"method": "POST",
+							"body": {
+								"value": "{\n    \"title\": \"@{activity('Master_Process_Data_Internal').output.pipelineName} FAILED!\",\n    \"message\": \"Error: @{activity('Master_Process_Data_Internal').error.message}\",\n    \"color\": \"Red\",\n    \"dataFactoryName\": \"@{pipeline().DataFactory}\",\n    \"pipelineName\": \"@{activity('Master_Process_Data_Internal').output.pipelineName}\",\n    \"pipelineRunId\": \"@{activity('Master_Process_Data_Internal').output.pipelineRunId}\",\n    \"time\": \"@{utcnow()}\",\n   \"recipientEmailAddress\":\"@{activity('GetEmailList').output.firstRow.InterfaceFailureAlertEmails}\"\n    }",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "GetEmailList",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT InterfaceSuccessAlertEmails,InterfaceFailureAlertEmails FROM dbo.DEX_Interface_Setup",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "Tab_DEX_Interface_Setup",
+								"type": "DatasetReference"
+							}
+						}
+					},
+					{
+						"name": "Master_Process_Data_Internal",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "GetEmailList",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Master_Process_Data_Internal",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true
+						}
+					}
+				],
+				"annotations": [],
+				"lastPublishTime": "2021-08-27T05:03:03Z"
+			},
+			"dependsOn": []
+		}
+	]
+}

@@ -1,0 +1,39 @@
+{
+	"name": "Storage_IB_InProcess_Folder_Blob",
+	"properties": {
+		"description": "It describes the destination store.",
+		"linkedServiceName": {
+			"referenceName": "sadexprod",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"Container": {
+				"type": "String",
+				"defaultValue": "/"
+			},
+			"Directory": {
+				"type": "String",
+				"defaultValue": "inprocess"
+			},
+			"filename": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"folderPath": {
+					"value": "@{dataset().Directory}",
+					"type": "Expression"
+				},
+				"container": {
+					"value": "@{dataset().Container}",
+					"type": "Expression"
+				}
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

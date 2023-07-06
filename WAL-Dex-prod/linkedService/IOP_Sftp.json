@@ -1,0 +1,23 @@
+{
+	"name": "IOP_Sftp",
+	"properties": {
+		"annotations": [],
+		"type": "Sftp",
+		"typeProperties": {
+			"host": "isleofparadise.sftp.wpengine.com",
+			"port": "2222",
+			"skipHostKeyValidation": true,
+			"authenticationType": "Basic",
+			"userName": "isleofparadise-elation",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "kvDEXProd",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "IOP-SFTP-Password"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/linkedservices"
+}

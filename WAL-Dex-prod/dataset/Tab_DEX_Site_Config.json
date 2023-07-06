@@ -1,0 +1,38 @@
+{
+	"name": "Tab_DEX_Site_Config",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "DEXInterfaceProd",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "SiteCode",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Prefix",
+				"type": "nvarchar"
+			},
+			{
+				"name": "TennantID",
+				"type": "nvarchar"
+			},
+			{
+				"name": "CompanyName",
+				"type": "nvarchar"
+			},
+			{
+				"name": "ActiveEnvironment",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "DEX_Site_Config"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

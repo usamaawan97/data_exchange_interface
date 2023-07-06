@@ -1,0 +1,63 @@
+{
+	"name": "Tab_DEX_Interface_Setup",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "DEXInterfaceProd",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "WB_Interface_Setup_Id",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "AZKeyVaultURL",
+				"type": "nvarchar"
+			},
+			{
+				"name": "BCBaseURL",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Version",
+				"type": "nvarchar"
+			},
+			{
+				"name": "DefaultTennantID",
+				"type": "nvarchar"
+			},
+			{
+				"name": "ActiveEnvironment",
+				"type": "nvarchar"
+			},
+			{
+				"name": "ExchangeRateAPIUrl",
+				"type": "nvarchar"
+			},
+			{
+				"name": "InterfaceSuccessAlertEmails",
+				"type": "nvarchar"
+			},
+			{
+				"name": "InterfaceFailureAlertEmails",
+				"type": "nvarchar"
+			},
+			{
+				"name": "InterfaceInboundFilesBasePath",
+				"type": "nvarchar"
+			},
+			{
+				"name": "InterfaceOutboundFilesBasePath",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "DEX_Interface_Setup"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

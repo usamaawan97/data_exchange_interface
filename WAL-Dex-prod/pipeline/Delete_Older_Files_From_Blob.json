@@ -1,0 +1,88 @@
+{
+	"name": "Delete_Older_Files_From_Blob",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Container Names",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 5,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "Storage_Source_Destination_Blob",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "/",
+							"Directory": "/"
+						}
+					},
+					"fieldList": [
+						"childItems"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "BinaryReadSettings"
+					}
+				}
+			},
+			{
+				"name": "ForEach Container",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Container Names",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Container Names').output.childItems",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Delete_Older_Files_From_Blob_Internal",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Delete_Older_Files_From_Blob_Internal",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"container": {
+										"value": "@item().name",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"folder": {
+			"name": "Ecom"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-08-30T10:13:47Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

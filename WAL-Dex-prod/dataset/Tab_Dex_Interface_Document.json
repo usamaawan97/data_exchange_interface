@@ -1,0 +1,87 @@
+{
+	"name": "Tab_Dex_Interface_Document",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "DEXInterfaceProd",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "MessageID",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "SiteCode",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Direction",
+				"type": "nvarchar"
+			},
+			{
+				"name": "MessageDate",
+				"type": "date"
+			},
+			{
+				"name": "MessageType",
+				"type": "nvarchar"
+			},
+			{
+				"name": "CreatedOn",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "Exported",
+				"type": "bit"
+			},
+			{
+				"name": "ExportedOn",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "LastUpdatedOn",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "FileData",
+				"type": "xml"
+			},
+			{
+				"name": "FileName",
+				"type": "nvarchar"
+			},
+			{
+				"name": "BCMessageID",
+				"type": "nvarchar"
+			},
+			{
+				"name": "ConfirmationSentToBC",
+				"type": "bit"
+			},
+			{
+				"name": "ConfirmationSentOn",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "InterfaceCode",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "DEX_Interface_Document"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

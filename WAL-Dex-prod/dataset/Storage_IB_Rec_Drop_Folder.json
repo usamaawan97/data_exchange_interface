@@ -1,0 +1,39 @@
+{
+	"name": "Storage_IB_Rec_Drop_Folder",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "sadexprod",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"Container": {
+				"type": "String"
+			},
+			"Directory": {
+				"type": "String"
+			},
+			"File": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"type": "Xml",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"fileName": {
+					"value": "@dataset().File",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().Directory",
+					"type": "Expression"
+				},
+				"container": {
+					"value": "@dataset().Container",
+					"type": "Expression"
+				}
+			}
+		}
+	}
+}

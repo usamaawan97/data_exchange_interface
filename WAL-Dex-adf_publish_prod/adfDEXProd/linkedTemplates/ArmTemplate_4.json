@@ -1,0 +1,830 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adfDEXProd"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/Master_Process_Data_Internal')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Update_BC_Message_Queue",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Get_data_From_BC",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Update_BC_Message_Queue",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Get_data_From_BC",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Send_Data_To_BC",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Get_Data_From_BC",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Send_Data_To_BC",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Get_Data_From_Byoma_FTP",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Get_Data_From_Tanologist_FTP",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Get_Data_From_Tanluxe_FTP",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Get_Data_From_IOP_FTP",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Send_Data_To_BC",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Get_Data_From_Byoma_FTP",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Get_Data_From_Byoma_FTP",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Send_Data_To_WC",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Update_BC_Message_Queue",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Send_Data_To_WC",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Get_Data_From_Tanologist_FTP",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Get_Data_From_Tanologist_FTP",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Get_Data_From_Tanluxe_FTP",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Get_Data_From_Tanluxe_FTP",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Get_Data_From_IOP_FTP",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Get_Data_From_IOP_FTP",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"folder": {
+					"name": "Ecom"
+				},
+				"annotations": [],
+				"lastPublishTime": "2021-08-27T04:53:26Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Master_Process_Rec')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Send Failure Email",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Master_Process_Rec_Internal",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 5,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://prod-26.uksouth.logic.azure.com:443/workflows/660cbc90a51a40dab53e76f370f74e70/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=rslDaEeWOQuFduFl-Q7zq0CcPvzeZBaVvKrOXGfeAak",
+								"type": "Expression"
+							},
+							"method": "POST",
+							"headers": {},
+							"body": {
+								"value": "{\n    \"title\": \"@{activity('Master_Process_Rec_Internal').output.pipelineName} FAILED!\",\n    \"message\": \"Error: @{activity('Master_Process_Rec_Internal').error.message}\",\n    \"color\": \"Red\",\n    \"dataFactoryName\": \"@{pipeline().DataFactory}\",\n    \"pipelineName\": \"@{activity('Master_Process_Rec_Internal').output.pipelineName}\",\n    \"pipelineRunId\": \"@{activity('Master_Process_Rec_Internal').output.pipelineRunId}\",\n    \"time\": \"@{utcnow()}\",\n   \"recipientEmailAddress\":\"@{activity('GetEmailList').output.firstRow.InterfaceFailureAlertEmails}\"\n    }",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "GetEmailList",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 5,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT InterfaceSuccessAlertEmails,InterfaceFailureAlertEmails FROM dbo.DEX_Interface_Setup",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "Tab_DEX_Interface_Setup",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						}
+					},
+					{
+						"name": "Master_Process_Rec_Internal",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "GetEmailList",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Master_Process_Rec_Internal",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"folder": {
+					"name": "Reconciliation"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Master_Cycle_ILG')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Get_BC_Access_Token",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Get_Oauth_Service_Configuration",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 5,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "@activity('Get_Oauth_Service_Configuration').output.firstRow.ServiceURL",
+								"type": "Expression"
+							},
+							"method": "POST",
+							"headers": {
+								"Content-type": {
+									"value": "@activity('Get_Oauth_Service_Configuration').output.firstRow.ContentType",
+									"type": "Expression"
+								}
+							},
+							"body": {
+								"value": "grant_type=@{activity('Get_Oauth_Service_Configuration').output.firstRow.GrantType}\n&client_id=@{activity('Get_Oauth_Service_Configuration').output.firstRow.ClientID}\n&client_secret=@{activity('Get_Oauth_Service_Configuration').output.firstRow.ClientSecret}\n&scope=@{activity('Get_Oauth_Service_Configuration').output.firstRow.Scope}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get_Oauth_Service_Configuration",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 5,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[[dbo].[Get_Oauth_Service_Configuration]",
+								"storedProcedureParameters": {
+									"ServiceCode": {
+										"type": "String",
+										"value": "GetOauthConfig"
+									}
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "Tab_DEX_Oauth_Config",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": true
+						}
+					},
+					{
+						"name": "Update_Oauth_Access_Token_DB",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Get_BC_Access_Token",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 5,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[dbo].[Update_Oauth_Access_Token_ILG]",
+							"storedProcedureParameters": {
+								"AccessToken": {
+									"value": {
+										"value": "@activity('Get_BC_Access_Token').output.access_token",
+										"type": "Expression"
+									},
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "DEXInterfaceProd",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Master_Cycle_ILG_Internal",
+						"description": "To run ILG Cycle",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Update_Oauth_Access_Token_DB",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "GetEmailList",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Master_Cycle_ILG_Internal",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Send Failure Email",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Master_Cycle_ILG_Internal",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 5,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://prod-26.uksouth.logic.azure.com:443/workflows/660cbc90a51a40dab53e76f370f74e70/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=rslDaEeWOQuFduFl-Q7zq0CcPvzeZBaVvKrOXGfeAak",
+								"type": "Expression"
+							},
+							"method": "POST",
+							"headers": {},
+							"body": {
+								"value": "{\n    \"title\": \"@{activity('Master_Cycle_ILG_Internal').output.pipelineName} FAILED!\",\n    \"message\": \"Error: @{activity('Master_Cycle_ILG_Internal').error.message}\",\n    \"color\": \"Red\",\n    \"dataFactoryName\": \"@{pipeline().DataFactory}\",\n    \"pipelineName\": \"@{activity('Master_Cycle_ILG_Internal').output.pipelineName}\",\n    \"pipelineRunId\": \"@{activity('Master_Cycle_ILG_Internal').output.pipelineRunId}\",\n    \"time\": \"@{utcnow()}\",\n   \"recipientEmailAddress\":\"@{activity('GetEmailList').output.firstRow.InterfaceFailureAlertEmails}\"\n    }",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "GetEmailList",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 5,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT InterfaceSuccessAlertEmails,InterfaceFailureAlertEmails FROM dbo.DEX_Interface_Setup",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "Tab_DEX_Interface_Setup",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"folder": {
+					"name": "ILG Confirmations"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Master_Process_Data')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Send Failure Email",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Master_Process_Data_Internal",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 5,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "https://prod-26.uksouth.logic.azure.com:443/workflows/660cbc90a51a40dab53e76f370f74e70/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=rslDaEeWOQuFduFl-Q7zq0CcPvzeZBaVvKrOXGfeAak",
+								"type": "Expression"
+							},
+							"method": "POST",
+							"headers": {},
+							"body": {
+								"value": "{\n    \"title\": \"@{activity('Master_Process_Data_Internal').output.pipelineName} FAILED!\",\n    \"message\": \"Error: @{activity('Master_Process_Data_Internal').error.message}\",\n    \"color\": \"Red\",\n    \"dataFactoryName\": \"@{pipeline().DataFactory}\",\n    \"pipelineName\": \"@{activity('Master_Process_Data_Internal').output.pipelineName}\",\n    \"pipelineRunId\": \"@{activity('Master_Process_Data_Internal').output.pipelineRunId}\",\n    \"time\": \"@{utcnow()}\",\n   \"recipientEmailAddress\":\"@{activity('GetEmailList').output.firstRow.InterfaceFailureAlertEmails}\"\n    }",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "GetEmailList",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 5,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT InterfaceSuccessAlertEmails,InterfaceFailureAlertEmails FROM dbo.DEX_Interface_Setup",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "Tab_DEX_Interface_Setup",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						}
+					},
+					{
+						"name": "Master_Process_Data_Internal",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "GetEmailList",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Update_Oauth_Access_Token_DB",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Master_Process_Data_Internal",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Get_BC_Access_Token",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Get_Oauth_Service_Configuration",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 5,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "@activity('Get_Oauth_Service_Configuration').output.firstRow.ServiceURL",
+								"type": "Expression"
+							},
+							"method": "POST",
+							"headers": {
+								"Content-type": {
+									"value": "@activity('Get_Oauth_Service_Configuration').output.firstRow.ContentType",
+									"type": "Expression"
+								}
+							},
+							"body": {
+								"value": "grant_type=@{activity('Get_Oauth_Service_Configuration').output.firstRow.GrantType}\n&client_id=@{activity('Get_Oauth_Service_Configuration').output.firstRow.ClientID}\n&client_secret=@{activity('Get_Oauth_Service_Configuration').output.firstRow.ClientSecret}\n&scope=@{activity('Get_Oauth_Service_Configuration').output.firstRow.Scope}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get_Oauth_Service_Configuration",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 5,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[[dbo].[Get_Oauth_Service_Configuration]",
+								"storedProcedureParameters": {
+									"ServiceCode": {
+										"type": "String",
+										"value": "GetOauthConfig"
+									}
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "Tab_DEX_Oauth_Config",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": true
+						}
+					},
+					{
+						"name": "Update_Oauth_Access_Token_DB",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Get_BC_Access_Token",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 5,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[dbo].[Update_Oauth_Access_Token]",
+							"storedProcedureParameters": {
+								"AccessToken": {
+									"value": {
+										"value": "@activity('Get_BC_Access_Token').output.access_token",
+										"type": "Expression"
+									},
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "DEXInterfaceProd",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"folder": {
+					"name": "Ecom"
+				},
+				"annotations": [],
+				"lastPublishTime": "2021-08-27T05:03:03Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/Master_Process_Data_Internal')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/TR_Process_EDI_Cycle')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "Master_Cycle_EDI",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Minute",
+						"interval": 15,
+						"startTime": "2022-10-06T00:55:00Z",
+						"timeZone": "UTC"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/TR_Process_Reco_Data')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "Master_Process_Rec",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Day",
+						"interval": 1,
+						"startTime": "2022-02-09T02:00:00Z",
+						"timeZone": "UTC"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/Master_Process_Rec')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/TR_Process_Data')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "Master_Process_Data",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Minute",
+						"interval": 15,
+						"startTime": "2021-09-21T00:00:00Z",
+						"timeZone": "UTC"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/Master_Process_Data')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/TR_Process_ILG_Cycle')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "Master_Cycle_ILG",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Minute",
+						"interval": 15,
+						"startTime": "2022-08-30T00:36:00Z",
+						"timeZone": "UTC"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/Master_Cycle_ILG')]"
+			]
+		}
+	]
+}

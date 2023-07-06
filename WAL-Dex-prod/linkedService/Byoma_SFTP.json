@@ -1,0 +1,22 @@
+{
+	"name": "Byoma_SFTP",
+	"properties": {
+		"annotations": [],
+		"type": "Sftp",
+		"typeProperties": {
+			"host": "byomalivems.sftp.wpengine.com",
+			"port": "2222",
+			"skipHostKeyValidation": true,
+			"authenticationType": "Basic",
+			"userName": "byomalivems-elation",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "kvDEXProd",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Byoma-SFTP-Password"
+			}
+		}
+	}
+}

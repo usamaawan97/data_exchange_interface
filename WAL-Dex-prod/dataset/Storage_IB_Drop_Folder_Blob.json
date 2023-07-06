@@ -1,0 +1,38 @@
+{
+	"name": "Storage_IB_Drop_Folder_Blob",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "sadexprod",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"Container": {
+				"type": "string",
+				"defaultValue": "/"
+			},
+			"Directory": {
+				"type": "string",
+				"defaultValue": "drop"
+			},
+			"filename": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobStorageLocation",
+				"folderPath": {
+					"value": "@dataset().Directory",
+					"type": "Expression"
+				},
+				"container": {
+					"value": "@dataset().Container",
+					"type": "Expression"
+				}
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

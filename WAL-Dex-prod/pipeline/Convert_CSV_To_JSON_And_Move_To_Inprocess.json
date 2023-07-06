@@ -1,0 +1,97 @@
+{
+	"name": "Convert_CSV_To_JSON_And_Move_To_Inprocess",
+	"properties": {
+		"activities": [
+			{
+				"name": "Convert CSV To JSON",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"sink": {
+						"type": "JsonSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "JsonWriteSettings",
+							"filePattern": "arrayOfObjects"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "Storage_CSV_Source_With_Filename",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": {
+								"value": "@pipeline().parameters.SourceStore_Location",
+								"type": "Expression"
+							},
+							"File": {
+								"value": "@pipeline().parameters.FileName",
+								"type": "Expression"
+							},
+							"Directory": {
+								"value": "@pipeline().parameters.SourceStore_Directory",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "Storage_Json_with_Directory",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": {
+								"value": "@pipeline().parameters.DestinationStore_Location",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			}
+		],
+		"parameters": {
+			"SourceStore_Location": {
+				"type": "string"
+			},
+			"SourceStore_Directory": {
+				"type": "string"
+			},
+			"DestinationStore_Location": {
+				"type": "string"
+			},
+			"DestinationStore_Directory": {
+				"type": "string"
+			},
+			"FileName": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "ILG Confirmations"
+		},
+		"annotations": []
+	}
+}

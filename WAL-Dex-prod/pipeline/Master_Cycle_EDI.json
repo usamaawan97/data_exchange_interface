@@ -1,0 +1,198 @@
+{
+	"name": "Master_Cycle_EDI",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get_BC_Access_Token",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Get_Oauth_Service_Configuration",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@activity('Get_Oauth_Service_Configuration').output.firstRow.ServiceURL",
+						"type": "Expression"
+					},
+					"method": "POST",
+					"headers": {
+						"Content-type": {
+							"value": "@activity('Get_Oauth_Service_Configuration').output.firstRow.ContentType",
+							"type": "Expression"
+						}
+					},
+					"body": {
+						"value": "grant_type=@{activity('Get_Oauth_Service_Configuration').output.firstRow.GrantType}\n&client_id=@{activity('Get_Oauth_Service_Configuration').output.firstRow.ClientID}\n&client_secret=@{activity('Get_Oauth_Service_Configuration').output.firstRow.ClientSecret}\n&scope=@{activity('Get_Oauth_Service_Configuration').output.firstRow.Scope}",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Get_Oauth_Service_Configuration",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[dbo].[Get_Oauth_Service_Configuration]",
+						"storedProcedureParameters": {
+							"ServiceCode": {
+								"type": "String",
+								"value": "GetOauthConfig"
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "Tab_DEX_Oauth_Config",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "Update_Oauth_Access_Token_DB",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "Get_BC_Access_Token",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[dbo].[Update_Oauth_Access_Token_EDI]",
+					"storedProcedureParameters": {
+						"AccessToken": {
+							"value": {
+								"value": "@activity('Get_BC_Access_Token').output.access_token",
+								"type": "Expression"
+							},
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "DEXInterfaceProd",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "Send Failure Email",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Master_Cycle_EDI_Internal",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "https://prod-26.uksouth.logic.azure.com:443/workflows/660cbc90a51a40dab53e76f370f74e70/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=rslDaEeWOQuFduFl-Q7zq0CcPvzeZBaVvKrOXGfeAak",
+						"type": "Expression"
+					},
+					"method": "POST",
+					"body": {
+						"value": "{\n    \"title\": \"@{activity('Master_Cycle_EDI_Internal').output.pipelineName} FAILED!\",\n    \"message\": \"Error: @{activity('Master_Cycle_EDI_Internal').error.message}\",\n    \"color\": \"Red\",\n    \"dataFactoryName\": \"@{pipeline().DataFactory}\",\n    \"pipelineName\": \"@{activity('Master_Cycle_EDI_Internal').output.pipelineName}\",\n    \"pipelineRunId\": \"@{activity('Master_Cycle_EDI_Internal').output.pipelineRunId}\",\n    \"time\": \"@{utcnow()}\",\n   \"recipientEmailAddress\":\"@{activity('GetEmailList').output.firstRow.InterfaceFailureAlertEmails}\"\n    }",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "GetEmailList",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT InterfaceSuccessAlertEmails,InterfaceFailureAlertEmails FROM dbo.DEX_Interface_Setup",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "Tab_DEX_Interface_Setup",
+						"type": "DatasetReference"
+					}
+				}
+			},
+			{
+				"name": "Master_Cycle_EDI_Internal",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Update_Oauth_Access_Token_DB",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "GetEmailList",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Master_Cycle_EDI_Internal",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			}
+		],
+		"folder": {
+			"name": "EDI Confirmations"
+		},
+		"annotations": []
+	}
+}

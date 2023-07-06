@@ -1,0 +1,23 @@
+{
+	"name": "SftpWpEngine",
+	"properties": {
+		"annotations": [],
+		"type": "Sftp",
+		"typeProperties": {
+			"host": "futurebeauty.sftp.wpengine.com",
+			"port": "2222",
+			"skipHostKeyValidation": true,
+			"authenticationType": "Basic",
+			"userName": "futurebeauty-elation",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "kvDEXProd",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "WC-SFTP-Password"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/linkedservices"
+}

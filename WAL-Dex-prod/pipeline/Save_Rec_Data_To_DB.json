@@ -1,0 +1,147 @@
+{
+	"name": "Save_Rec_Data_To_DB",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get SiteCodes",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 5,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT distinct SiteCode \nfrom DEX_Rec_Interface_Document",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "Tab_DEX_Rec_Interface_Document",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach SiteCode",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get SiteCodes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get SiteCodes').output.value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Get Matched Orders",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[dbo].[Get_Matched_Recon_Order_Numbers]",
+									"storedProcedureParameters": {
+										"SiteCode": {
+											"type": "String",
+											"value": {
+												"value": "@item().SiteCode",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "Tab_DEX_Rec_Interface_Document",
+									"type": "DatasetReference"
+								},
+								"firstRowOnly": false
+							}
+						},
+						{
+							"name": "Save_Rec_Data_To_DB_Internal",
+							"type": "ExecutePipeline",
+							"dependsOn": [
+								{
+									"activity": "Get Matched Orders",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Save_Rec_Data_To_DB_Internal",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"MatchedOrdersArray": {
+										"value": "@activity('Get Matched Orders').output.value",
+										"type": "Expression"
+									}
+								}
+							}
+						},
+						{
+							"name": "Truncate_DEX_Rec_Interface_Shipment_Order",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Save_Rec_Data_To_DB_Internal",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[Truncate_DEX_Rec_Interface_Shipment_Order]"
+							},
+							"linkedServiceName": {
+								"referenceName": "DEXInterfaceProd",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			}
+		],
+		"folder": {
+			"name": "Reconciliation"
+		},
+		"annotations": []
+	}
+}

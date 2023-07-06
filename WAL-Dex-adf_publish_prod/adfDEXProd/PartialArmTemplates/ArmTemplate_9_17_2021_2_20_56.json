@@ -1,0 +1,1433 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adfDEXProd"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/Process_Data_Files')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Get InProcess Files",
+						"type": "GetMetadata",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "Storage_IB_InProcess_Folder_Blob",
+								"type": "DatasetReference",
+								"parameters": {
+									"Container": "/",
+									"Directory": "ibinprocess",
+									"filename": "*"
+								}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "BinaryReadSettings"
+							}
+						}
+					},
+					{
+						"name": "For Each InProcess File",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get InProcess Files",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get InProcess Files').output.childItems",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Get File Count",
+									"type": "Lookup",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"sqlReaderStoredProcedureName": "[[dbo].[Check For Processed File]",
+											"storedProcedureParameters": {
+												"FileName": {
+													"type": "String",
+													"value": {
+														"value": "@item().name",
+														"type": "Expression"
+													}
+												}
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"dataset": {
+											"referenceName": "Tab_BC_Inb_Docs",
+											"type": "DatasetReference"
+										}
+									}
+								},
+								{
+									"name": "If File Count Is 0",
+									"type": "IfCondition",
+									"dependsOn": [
+										{
+											"activity": "Get File Count",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"expression": {
+											"value": "@equals(activity('Get File Count').output.firstRow.FileCount,1)",
+											"type": "Expression"
+										},
+										"ifFalseActivities": [
+											{
+												"name": "Load In Process File From BS",
+												"type": "SqlServerStoredProcedure",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "7.00:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"storedProcedureName": "[[dbo].[Load_InProcess_Files_From_BS]",
+													"storedProcedureParameters": {
+														"ContainerName": {
+															"value": "ibinprocess",
+															"type": "String"
+														},
+														"DataSource": {
+															"value": "AzureStorage",
+															"type": "String"
+														},
+														"Direction": {
+															"value": "Inbound",
+															"type": "String"
+														},
+														"FileName": {
+															"value": {
+																"value": "@item().name",
+																"type": "Expression"
+															},
+															"type": "String"
+														}
+													}
+												},
+												"linkedServiceName": {
+													"referenceName": "DEXInterfaceProd",
+													"type": "LinkedServiceReference"
+												}
+											}
+										]
+									}
+								}
+							]
+						}
+					}
+				],
+				"annotations": [],
+				"lastPublishTime": "2021-08-14T16:26:16Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/Storage_IB_InProcess_Folder_Blob')]",
+				"[concat(variables('factoryId'), '/datasets/Tab_BC_Inb_Docs')]",
+				"[concat(variables('factoryId'), '/linkedServices/DEXInterfaceProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Send_Data_To_BC')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Get Interface Docs For BC",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT [MessageID]\n\t , [Direction]\n      ,[SiteCode]\n      ,[MessageDate]\n      ,[MessageType]\n      ,[CreatedOn]\n      ,[Exported]\n      ,[ExportedOn]\n      ,[LastUpdatedOn]\n      ,[FileData]\n      ,[FileName]\n      ,[BCMessageID]\n  FROM [dbo].[DEX_Interface_Document]\n  WHERE Direction = 'Inbound' AND Exported = 0",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "Tab_BC_Inb_Docs",
+								"type": "DatasetReference"
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "For Each Document",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get Interface Docs For BC",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get Interface Docs For BC').output.value\n",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Send Document To BC",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "Get Service Config",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [
+										{
+											"name": "Source",
+											"value": "v2.0/ac636b3d-2eb0-41e7-b5a6-7e15645731e9/SandboxDev/WS/We%20Are%20Luxe%20-%20Live/Codeunit/MessageMgmt"
+										},
+										{
+											"name": "Destination",
+											"value": "drop//"
+										}
+									],
+									"typeProperties": {
+										"source": {
+											"type": "XmlSource",
+											"storeSettings": {
+												"type": "HttpReadSettings",
+												"requestMethod": "POST",
+												"additionalHeaders": {
+													"value": "Content-Type:@{activity('Get Service Config').output.firstRow.ContentType}\nsoapAction:@{activity('Get Service Config').output.firstRow.SoapAction}",
+													"type": "Expression"
+												},
+												"requestBody": {
+													"value": "@{concat('<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n    <soap:Body>\n        <CreateMessage xmlns=\"urn:microsoft-dynamics-schemas/codeunit/MessageMgmt\">\n            <xMLData>\n                <MessageAcknowledgement xmlns=\"urn:microsoft-dynamics-nav/xmlports/x52000\">\n                    <Id/>\n                    <MessageType>',\n\n            item().MessageType \n,'</MessageType>\n                    <Direction>Inbound</Direction>\n                    <Payload>\n                        <![CDATA[ ',\n\n            item().FileData \n,'\n                           ]]>\n\t\t\t\t\t\n                    </Payload>\n                    <Status>Unprocessed</Status>\n                    <ExternalRefID>\n                    <![CDATA[ ',\n\n            item().MessageID\n,'\n                           ]]> \n                   </ExternalRefID>\n                  <SiteCode>\n                  <![CDATA[ ',\n\n            item().SiteCode\n,'\n                           ]]> \n               </SiteCode>\n                </MessageAcknowledgement>\n            </xMLData>\n        </CreateMessage>\n    </soap:Body>\n</soap:Envelope>')}",
+													"type": "Expression"
+												},
+												"requestTimeout": ""
+											},
+											"formatSettings": {
+												"type": "XmlReadSettings",
+												"validationMode": "none",
+												"detectDataType": true,
+												"namespaces": false
+											}
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "insert"
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"path": "$['Soap:Envelope']['Soap:Body']['CreateMessage_Result']['xMLData']['MessageAcknowledgement']['Id']"
+													},
+													"sink": {
+														"name": "BCMessageID",
+														"type": "Int32"
+													}
+												},
+												{
+													"source": {
+														"path": "$['Soap:Envelope']['Soap:Body']['CreateMessage_Result']['xMLData']['MessageAcknowledgement']['ExternalRefID']"
+													},
+													"sink": {
+														"name": "MessageID",
+														"type": "Int32"
+													}
+												}
+											],
+											"collectionReference": ""
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "Http_BC_WebService",
+											"type": "DatasetReference",
+											"parameters": {
+												"RelUrl": {
+													"value": "@activity('Get Service Config').output.firstRow.RelativeURL",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "Tab_DEX_Interface_Docs_Response",
+											"type": "DatasetReference"
+										}
+									]
+								},
+								{
+									"name": "Get Service Config",
+									"type": "Lookup",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"sqlReaderStoredProcedureName": "[[dbo].[Get_Service_Configuration]",
+											"storedProcedureParameters": {
+												"ServiceCode": {
+													"type": "String",
+													"value": "CreateMessage"
+												},
+												"SiteCode": {
+													"type": "String",
+													"value": {
+														"value": "@item().SiteCode",
+														"type": "Expression"
+													}
+												}
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"dataset": {
+											"referenceName": "Tab_BC_Inb_Docs",
+											"type": "DatasetReference"
+										}
+									}
+								},
+								{
+									"name": "Mark Document Exported",
+									"type": "Lookup",
+									"dependsOn": [
+										{
+											"activity": "Send Document To BC",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"sqlReaderStoredProcedureName": "[[dbo].[Update_Exported_Message]",
+											"storedProcedureParameters": {
+												"MessageID": {
+													"type": "Int32",
+													"value": {
+														"value": "@item().MessageID",
+														"type": "Expression"
+													}
+												}
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"dataset": {
+											"referenceName": "Tab_BC_Inb_Docs",
+											"type": "DatasetReference"
+										}
+									}
+								},
+								{
+									"name": "Update Interface Documents",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "Mark Document Exported",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[[dbo].[Update_BC_Message ID_From_Response]"
+									},
+									"linkedServiceName": {
+										"referenceName": "DEXInterfaceProd",
+										"type": "LinkedServiceReference"
+									}
+								}
+							]
+						}
+					}
+				],
+				"annotations": [],
+				"lastPublishTime": "2021-08-27T05:03:03Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/Tab_BC_Inb_Docs')]",
+				"[concat(variables('factoryId'), '/datasets/Tab_DEX_Interface_Docs_Response')]",
+				"[concat(variables('factoryId'), '/linkedServices/DEXInterfaceProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Send_Data_To_WC_Internal')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "For Each Outbound Document",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get Outbound Documents",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get Outbound Documents').output.value",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Export Message to BS",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [
+										{
+											"name": "Source",
+											"value": "dbo.BC_Inbound_Documents"
+										},
+										{
+											"name": "Destination",
+											"value": "obdrop//@{\nreplace(\nconcat(item().SiteCode,'_',item().MessageType,'_',formatDateTime(utcNow(),'yyyyMMddhhmmss')),' ','')\n\n}.xml\n"
+										}
+									],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"sqlReaderStoredProcedureName": "dbo.Get_OutBound_Msg_Detail",
+											"storedProcedureParameters": {
+												"MessageID": {
+													"type": "Int32",
+													"value": {
+														"value": "@item().MessageID",
+														"type": "Expression"
+													}
+												}
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "FileData",
+														"type": "String",
+														"physicalType": "xml"
+													},
+													"sink": {
+														"type": "String",
+														"physicalType": "String",
+														"ordinal": 1
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "Tab_BC_Inb_Docs",
+											"type": "DatasetReference"
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "Storage_OB_Order_Confirmation_Save_In_Blob",
+											"type": "DatasetReference",
+											"parameters": {
+												"SiteCode": {
+													"value": "@item().SiteCode",
+													"type": "Expression"
+												},
+												"MessageType": {
+													"value": "@item().MessageType",
+													"type": "Expression"
+												},
+												"MessageId": {
+													"value": "@item().MessageID",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "Update Exported Messages",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "Export Message to BS",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[[dbo].[Update_Exported_Message]",
+										"storedProcedureParameters": {
+											"MessageID": {
+												"value": {
+													"value": "@item().MessageID",
+													"type": "Expression"
+												},
+												"type": "Int32"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "DEXInterfaceProd",
+										"type": "LinkedServiceReference"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "Get Outbound Documents",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT TOP 1000\n\t\tMessageID, SiteCode, MessageType, FileData,InterfaceCode\n\tFROM \n\t\tDEX_Interface_Document \n\tWHERE \n\t\tDirection = 'Outbound'  and Exported = 0 and InterfaceCode= '@{pipeline().parameters.InterfaceCode}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "Tab_Dex_Interface_Document",
+								"type": "DatasetReference"
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "Upload Files to WC",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "For Each Outbound Document",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Upload_Files_To_WC",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"Interface_Code": {
+									"value": "@pipeline().parameters.InterfaceCode",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"parameters": {
+					"InterfaceCode": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2021-08-26T15:43:54Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/Tab_Dex_Interface_Document')]",
+				"[concat(variables('factoryId'), '/datasets/Tab_BC_Inb_Docs')]",
+				"[concat(variables('factoryId'), '/datasets/Storage_OB_Order_Confirmation_Save_In_Blob')]",
+				"[concat(variables('factoryId'), '/linkedServices/DEXInterfaceProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Storage_IB_Drop_Folder_Blob')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "sadexprod",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Container": {
+						"type": "string",
+						"defaultValue": "/"
+					},
+					"Directory": {
+						"type": "string",
+						"defaultValue": "drop"
+					},
+					"filename": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"folderPath": {
+							"value": "@dataset().Directory",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@dataset().Container",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/sadexprod')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Storage_IB_InProcess_Folder_Blob')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "It describes the destination store.",
+				"linkedServiceName": {
+					"referenceName": "sadexprod",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Container": {
+						"type": "String",
+						"defaultValue": "/"
+					},
+					"Directory": {
+						"type": "String",
+						"defaultValue": "inprocess"
+					},
+					"filename": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"folderPath": {
+							"value": "@{dataset().Directory}",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@{dataset().Container}",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/sadexprod')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Storage_OB_Order_Confirmation_Save_In_Blob')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "sadexprod",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"SiteCode": {
+						"type": "string"
+					},
+					"MessageType": {
+						"type": "string"
+					},
+					"MessageId": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@{concat(dataset().SiteCode,'_',dataset().MessageType,'_',dataset().MessageId,'-',formatDateTime(utcNow(),'yyyyMMddhhmmss'))}.xml",
+							"type": "Expression"
+						},
+						"container": "obdrop"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "",
+					"quoteChar": ""
+				},
+				"schema": [
+					{
+						"type": "String"
+					}
+				]
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/sadexprod')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Storage_Source_Des_File_Blob')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "It describes the file in the data source store.",
+				"linkedServiceName": {
+					"referenceName": "sadexprod",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Container": {
+						"type": "String"
+					},
+					"Directory": {
+						"type": "String"
+					},
+					"filename": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@dataset().filename",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@{dataset().Directory}",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@{dataset().Container}",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/sadexprod')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Storage_Source_Destination_Blob')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "It describes the folder in the data source store.",
+				"linkedServiceName": {
+					"referenceName": "sadexprod",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Container": {
+						"type": "String"
+					},
+					"Directory": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"folderPath": {
+							"value": "@{dataset().Directory}",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@{dataset().Container}",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/sadexprod')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Tab_BC_Inb_Docs')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "DEXInterfaceProd",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "MessageID",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "SiteCode",
+						"type": "nvarchar"
+					},
+					{
+						"name": "MessageDate",
+						"type": "date"
+					},
+					{
+						"name": "MessageType",
+						"type": "nvarchar"
+					},
+					{
+						"name": "CreatedOn",
+						"type": "datetime",
+						"precision": 23,
+						"scale": 3
+					},
+					{
+						"name": "Exported",
+						"type": "bit"
+					},
+					{
+						"name": "ExportedOn",
+						"type": "datetime",
+						"precision": 23,
+						"scale": 3
+					},
+					{
+						"name": "LastUpdatedOn",
+						"type": "datetime",
+						"precision": 23,
+						"scale": 3
+					},
+					{
+						"name": "FileData",
+						"type": "xml"
+					},
+					{
+						"name": "FileName",
+						"type": "nvarchar"
+					},
+					{
+						"name": "BCMessageID",
+						"type": "nvarchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "BC_Inbound_Documents"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/DEXInterfaceProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Tab_BC_Outb_Doc_Response')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "DEXInterfaceProd",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "ID",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "BCMessageID",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "MessageType",
+						"type": "nvarchar"
+					},
+					{
+						"name": "Direction",
+						"type": "nvarchar"
+					},
+					{
+						"name": "PayLoad",
+						"type": "xml"
+					},
+					{
+						"name": "SiteCode",
+						"type": "nvarchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "BC_Outbound_Document_Response"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/DEXInterfaceProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Tab_DEX_Interface')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "DEXInterfaceProd",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "InterfaceCode",
+						"type": "nvarchar"
+					},
+					{
+						"name": "Name",
+						"type": "nvarchar"
+					},
+					{
+						"name": "Enabled",
+						"type": "bit"
+					},
+					{
+						"name": "CopyToOutboundFolder",
+						"type": "bit"
+					},
+					{
+						"name": "CopyToOutboundInterfaceID",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "Type",
+						"type": "nvarchar"
+					},
+					{
+						"name": "Action",
+						"type": "nvarchar"
+					},
+					{
+						"name": "FTPConfig",
+						"type": "nvarchar"
+					},
+					{
+						"name": "FTPDropDir",
+						"type": "nvarchar"
+					},
+					{
+						"name": "FTPProcessedDir",
+						"type": "nvarchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "DEX_Interface"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/DEXInterfaceProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Tab_DEX_Interface_Docs_Response')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "DEXInterfaceProd",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "WBInboundBCDocumentId",
+						"type": "bigint",
+						"precision": 19
+					},
+					{
+						"name": "SiteCode",
+						"type": "text"
+					},
+					{
+						"name": "MessageDate",
+						"type": "date"
+					},
+					{
+						"name": "MessageType",
+						"type": "text"
+					},
+					{
+						"name": "CreatedOn",
+						"type": "datetime",
+						"precision": 23,
+						"scale": 3
+					},
+					{
+						"name": "Exported",
+						"type": "bit"
+					},
+					{
+						"name": "ExportedOn",
+						"type": "datetime",
+						"precision": 23,
+						"scale": 3
+					},
+					{
+						"name": "LastUpdatedOn",
+						"type": "datetime",
+						"precision": 23,
+						"scale": 3
+					},
+					{
+						"name": "FileData",
+						"type": "text"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "DEX_Interface_Document_Response"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/DEXInterfaceProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Tab_DEX_Interface_Setup')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "DEXInterfaceProd",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "WB_Interface_Setup_Id",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "AZKeyVaultURL",
+						"type": "nvarchar"
+					},
+					{
+						"name": "BCBaseURL",
+						"type": "nvarchar"
+					},
+					{
+						"name": "Version",
+						"type": "nvarchar"
+					},
+					{
+						"name": "DefaultTennantID",
+						"type": "nvarchar"
+					},
+					{
+						"name": "ActiveEnvironment",
+						"type": "nvarchar"
+					},
+					{
+						"name": "ExchangeRateAPIUrl",
+						"type": "nvarchar"
+					},
+					{
+						"name": "InterfaceSuccessAlertEmails",
+						"type": "nvarchar"
+					},
+					{
+						"name": "InterfaceFailureAlertEmails",
+						"type": "nvarchar"
+					},
+					{
+						"name": "InterfaceInboundFilesBasePath",
+						"type": "nvarchar"
+					},
+					{
+						"name": "InterfaceOutboundFilesBasePath",
+						"type": "nvarchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "DEX_Interface_Setup"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/DEXInterfaceProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Tab_DEX_Site_Config')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "DEXInterfaceProd",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "SiteCode",
+						"type": "nvarchar"
+					},
+					{
+						"name": "Prefix",
+						"type": "nvarchar"
+					},
+					{
+						"name": "TennantID",
+						"type": "nvarchar"
+					},
+					{
+						"name": "CompanyName",
+						"type": "nvarchar"
+					},
+					{
+						"name": "ActiveEnvironment",
+						"type": "nvarchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "DEX_Site_Config"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/DEXInterfaceProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Tab_Dex_Interface_Document')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "DEXInterfaceProd",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [
+					{
+						"name": "MessageID",
+						"type": "int",
+						"precision": 10
+					},
+					{
+						"name": "SiteCode",
+						"type": "nvarchar"
+					},
+					{
+						"name": "Direction",
+						"type": "nvarchar"
+					},
+					{
+						"name": "MessageDate",
+						"type": "date"
+					},
+					{
+						"name": "MessageType",
+						"type": "nvarchar"
+					},
+					{
+						"name": "CreatedOn",
+						"type": "datetime",
+						"precision": 23,
+						"scale": 3
+					},
+					{
+						"name": "Exported",
+						"type": "bit"
+					},
+					{
+						"name": "ExportedOn",
+						"type": "datetime",
+						"precision": 23,
+						"scale": 3
+					},
+					{
+						"name": "LastUpdatedOn",
+						"type": "datetime",
+						"precision": 23,
+						"scale": 3
+					},
+					{
+						"name": "FileData",
+						"type": "xml"
+					},
+					{
+						"name": "FileName",
+						"type": "nvarchar"
+					},
+					{
+						"name": "BCMessageID",
+						"type": "nvarchar"
+					},
+					{
+						"name": "ConfirmationSentToBC",
+						"type": "bit"
+					},
+					{
+						"name": "ConfirmationSentOn",
+						"type": "datetime",
+						"precision": 23,
+						"scale": 3
+					},
+					{
+						"name": "InterfaceCode",
+						"type": "nvarchar"
+					}
+				],
+				"typeProperties": {
+					"schema": "dbo",
+					"table": "DEX_Interface_Document"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/DEXInterfaceProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SftpWpEngine')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "Sftp",
+				"typeProperties": {
+					"host": "futurebeauty.sftp.wpengine.com",
+					"port": "2222",
+					"skipHostKeyValidation": true,
+					"authenticationType": "Basic",
+					"userName": "futurebeauty-elation",
+					"password": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "kvDEXProd",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "WC-SFTP-Password"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/kvDEXProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/kvDEXProd')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureKeyVault",
+				"typeProperties": {
+					"baseUrl": "https://kvDEXProd.vault.azure.net/"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DEXInterfaceProd')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"connectionString": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "kvDEXProd",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "SQL-Database-Connection-String"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/kvDEXProd')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/sadexprod')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobStorage",
+				"typeProperties": {
+					"connectionString": {
+						"type": "AzureKeyVaultSecret",
+						"store": {
+							"referenceName": "kvDEXProd",
+							"type": "LinkedServiceReference"
+						},
+						"secretName": "Storage-Account-Connection-String"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/kvDEXProd')]"
+			]
+		}
+	]
+}

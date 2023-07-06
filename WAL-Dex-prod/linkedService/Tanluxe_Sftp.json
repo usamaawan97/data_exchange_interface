@@ -1,0 +1,23 @@
+{
+	"name": "Tanluxe_Sftp",
+	"properties": {
+		"annotations": [],
+		"type": "Sftp",
+		"typeProperties": {
+			"host": "tanluxe.sftp.wpengine.com",
+			"port": "2222",
+			"skipHostKeyValidation": true,
+			"authenticationType": "Basic",
+			"userName": "tanluxe-elation",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "kvDEXProd",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "Tanluxe-SFTP-Password"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/linkedservices"
+}

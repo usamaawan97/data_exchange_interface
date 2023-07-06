@@ -1,0 +1,45 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "adfDEXProd"
+		},
+		"Byoma_SFTP_properties_typeProperties_host": {
+			"value": "byomalivems.sftp.wpengine.com"
+		},
+		"Byoma_SFTP_properties_typeProperties_userName": {
+			"value": "byomalivems-elation"
+		},
+		"DEXInterfaceProd_properties_typeProperties_connectionString_secretName": {
+			"value": "SQL-Database-Connection-String"
+		},
+		"Http_BC_Service_properties_typeProperties_url": {
+			"value": "https://api.businesscentral.dynamics.com/"
+		},
+		"IOP_Sftp_properties_typeProperties_host": {
+			"value": "isleofparadise.sftp.wpengine.com"
+		},
+		"IOP_Sftp_properties_typeProperties_userName": {
+			"value": "isleofparadise-elation"
+		},
+		"SftpWpEngine_properties_typeProperties_host": {
+			"value": "futurebeauty.sftp.wpengine.com"
+		},
+		"SftpWpEngine_properties_typeProperties_userName": {
+			"value": "futurebeauty-elation"
+		},
+		"Tanluxe_Sftp_properties_typeProperties_host": {
+			"value": "tanluxe.sftp.wpengine.com"
+		},
+		"Tanluxe_Sftp_properties_typeProperties_userName": {
+			"value": "tanluxe-elation"
+		},
+		"kvDEXProd_properties_typeProperties_baseUrl": {
+			"value": "https://kvDEXProd.vault.azure.net/"
+		},
+		"sadexprod_properties_typeProperties_connectionString_secretName": {
+			"value": "Storage-Account-Connection-String"
+		}
+	}
+}

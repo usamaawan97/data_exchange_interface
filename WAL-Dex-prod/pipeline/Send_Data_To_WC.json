@@ -1,0 +1,83 @@
+{
+	"name": "Send_Data_To_WC",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Outbound Interfaces List",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 5,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT InterfaceCode \nFROM Dex_Interface  \nWHERE [Enabled] = 1 AND Direction = 'Outbound' \n\t  AND InterfaceCode IN ('OBWCINV','OBWCORDCON','OBWCSHIP')",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "Tab_BC_Inb_Docs",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "For Each Interface",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Outbound Interfaces List",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Outbound Interfaces List').output.Value",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Send_Data_To_WC_Internal",
+							"type": "ExecutePipeline",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"pipeline": {
+									"referenceName": "Send_Data_To_WC_Internal",
+									"type": "PipelineReference"
+								},
+								"waitOnCompletion": true,
+								"parameters": {
+									"InterfaceCode": {
+										"value": "@item().InterfaceCode",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"folder": {
+			"name": "Ecom"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-08-27T03:06:40Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

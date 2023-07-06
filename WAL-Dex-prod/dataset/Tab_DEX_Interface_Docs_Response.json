@@ -1,0 +1,61 @@
+{
+	"name": "Tab_DEX_Interface_Docs_Response",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "DEXInterfaceProd",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "WBInboundBCDocumentId",
+				"type": "bigint",
+				"precision": 19
+			},
+			{
+				"name": "SiteCode",
+				"type": "text"
+			},
+			{
+				"name": "MessageDate",
+				"type": "date"
+			},
+			{
+				"name": "MessageType",
+				"type": "text"
+			},
+			{
+				"name": "CreatedOn",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "Exported",
+				"type": "bit"
+			},
+			{
+				"name": "ExportedOn",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "LastUpdatedOn",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "FileData",
+				"type": "text"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "DEX_Interface_Document_Response"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

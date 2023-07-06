@@ -1,0 +1,44 @@
+{
+	"name": "Master_Cycle_EDI_Internal",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get_Conf_From_EDI_FTP",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Get_Conf_From_EDI_FTP",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Send_Conf_To_BC_EDI",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Get_Conf_From_EDI_FTP",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "Send_Conf_To_BC_EDI",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			}
+		],
+		"folder": {
+			"name": "EDI Confirmations"
+		},
+		"annotations": []
+	}
+}

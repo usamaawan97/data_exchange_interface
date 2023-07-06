@@ -1,0 +1,563 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adfDEXProd"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/Get_Data_From_WC')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "GET WC Order Files",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Get Interface Info IBWCSO",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [
+							{
+								"name": "Source",
+								"value": "/wc/Outbound/Drop/"
+							},
+							{
+								"name": "Destination",
+								"value": "drop//"
+							}
+						],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "SftpReadSettings",
+									"recursive": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "WC_SFTP",
+								"type": "DatasetReference",
+								"parameters": {
+									"FolderName": {
+										"value": "@activity('Get Interface Info IBWCSO').output.value[0].FtpDropDir",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "Storage_IB_Drop_Folder_Blob",
+								"type": "DatasetReference",
+								"parameters": {
+									"Container": "/",
+									"Directory": "ibdrop",
+									"filename": "*"
+								}
+							}
+						]
+					},
+					{
+						"name": "Move Files to InProcess",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "For Each File To Delete",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Move FTP Shipment Files to Processed",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Move_Files",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"SourceStore_Location": {
+									"value": "/",
+									"type": "Expression"
+								},
+								"SourceStore_Directory": "ibdrop",
+								"DestinationStore_Location": "/",
+								"DestinationStore_Directory": "ibinprocess"
+							}
+						}
+					},
+					{
+						"name": "Process Data Files",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Move Files to InProcess",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Process_Data_Files",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true
+						}
+					},
+					{
+						"name": "Move Files to Processed",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Process Data Files",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "Move_Files",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"SourceStore_Location": {
+									"value": "/",
+									"type": "Expression"
+								},
+								"SourceStore_Directory": "ibinprocess",
+								"DestinationStore_Location": "/",
+								"DestinationStore_Directory": "ibprocessed"
+							}
+						}
+					},
+					{
+						"name": "FTP Move WC Orders to Processed",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "GET WC Order Files",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [
+							{
+								"name": "Source",
+								"value": "/wc/Outbound/Drop/"
+							},
+							{
+								"name": "Destination",
+								"value": "drop//"
+							}
+						],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "SftpReadSettings",
+									"recursive": true,
+									"deleteFilesAfterCompletion": false
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "SftpWriteSettings",
+									"operationTimeout": "01:00:00",
+									"useTempFileRename": false
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "WC_SFTP",
+								"type": "DatasetReference",
+								"parameters": {
+									"FolderName": {
+										"value": "@activity('Get Interface Info IBWCSO').output.value[0].FTPDropDir",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "WC_SFTP",
+								"type": "DatasetReference",
+								"parameters": {
+									"FolderName": {
+										"value": "@activity('Get Interface Info IBWCSO').output.value[0].FTPProcessedDir",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Get WC Shipment Files",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Get Interface Info IBPDRSHIP",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [
+							{
+								"name": "Source",
+								"value": "/wc/Outbound/Drop/"
+							},
+							{
+								"name": "Destination",
+								"value": "drop//"
+							}
+						],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "SftpReadSettings",
+									"recursive": true,
+									"deleteFilesAfterCompletion": false
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "WC_SFTP",
+								"type": "DatasetReference",
+								"parameters": {
+									"FolderName": {
+										"value": "@activity('Get Interface Info IBPDRSHIP').output.value[0].FtpDropDir",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "Storage_IB_Drop_Folder_Blob",
+								"type": "DatasetReference",
+								"parameters": {
+									"Container": "/",
+									"Directory": "ibdrop",
+									"filename": "*"
+								}
+							}
+						]
+					},
+					{
+						"name": "Move FTP Shipment Files to Processed",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Get WC Shipment Files",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [
+							{
+								"name": "Source",
+								"value": "/wc/Outbound/Drop/"
+							},
+							{
+								"name": "Destination",
+								"value": "drop//"
+							}
+						],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "SftpReadSettings",
+									"recursive": true,
+									"deleteFilesAfterCompletion": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "SftpWriteSettings",
+									"operationTimeout": "01:00:00",
+									"useTempFileRename": true
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "WC_SFTP",
+								"type": "DatasetReference",
+								"parameters": {
+									"FolderName": {
+										"value": "@activity('Get Interface Info IBPDRSHIP').output.value[0].FtpDropDir",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "WC_SFTP",
+								"type": "DatasetReference",
+								"parameters": {
+									"FolderName": {
+										"value": "@activity('Get Interface Info IBPDRSHIP').output.value[0].FTPProcessedDir",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Get Interface Info IBWCSO",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT DI.InterfaceCode, DI.[Enabled], DI.[Type], DI.[Direction], DI.[FTPDropDir], DI.FTPProcessedDir \nFROM dbo.DEX_Interface DI\nWHERE InterfaceCode = 'IBWCSO'\n",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "Tab_DEX_Interface",
+								"type": "DatasetReference"
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "Get Interface Info IBPDRSHIP",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT DI.InterfaceCode, DI.[Enabled], DI.[Type], DI.[Direction], DI.[FTPDropDir], DI.FTPProcessedDir \nFROM dbo.DEX_Interface DI\nWHERE InterfaceCode = 'IBPDRSHIP'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "Tab_DEX_Interface",
+								"type": "DatasetReference"
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "Get WC Files To Delete",
+						"type": "GetMetadata",
+						"dependsOn": [
+							{
+								"activity": "FTP Move WC Orders to Processed",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "WC_SFTP",
+								"type": "DatasetReference",
+								"parameters": {
+									"FolderName": {
+										"value": "@activity('Get Interface Info IBWCSO').output.value[0].FTPDropDir",
+										"type": "Expression"
+									}
+								}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "SftpReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "BinaryReadSettings"
+							}
+						}
+					},
+					{
+						"name": "For Each File To Delete",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get WC Files To Delete",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get WC Files To Delete').output.childItems",
+								"type": "Expression"
+							},
+							"isSequential": false,
+							"activities": [
+								{
+									"name": "Delete File",
+									"type": "Delete",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"dataset": {
+											"referenceName": "WC_SFTP_Connection_For_Del",
+											"type": "DatasetReference",
+											"parameters": {
+												"FolderName": {
+													"value": "@activity('Get Interface Info IBWCSO').output.value[0].FTPDropDir",
+													"type": "Expression"
+												},
+												"FileName": {
+													"value": "@item().name",
+													"type": "Expression"
+												}
+											}
+										},
+										"enableLogging": false,
+										"storeSettings": {
+											"type": "SftpReadSettings",
+											"recursive": true,
+											"enablePartitionDiscovery": false
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"annotations": [],
+				"lastPublishTime": "2021-08-27T04:51:19Z"
+			},
+			"dependsOn": []
+		}
+	]
+}

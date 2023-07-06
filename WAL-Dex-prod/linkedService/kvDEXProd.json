@@ -1,0 +1,10 @@
+{
+	"name": "kvDEXProd",
+	"properties": {
+		"annotations": [],
+		"type": "AzureKeyVault",
+		"typeProperties": {
+			"baseUrl": "https://kvDEXProd.vault.azure.net/"
+		}
+	}
+}

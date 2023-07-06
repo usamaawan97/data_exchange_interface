@@ -1,0 +1,437 @@
+{
+	"name": "Get_Ecom_Data_From_BC_Internal_ILG",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Messages From BC",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Get Service Config",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Get_Access_Token_DB",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "XmlSource",
+						"storeSettings": {
+							"type": "HttpReadSettings",
+							"requestMethod": "POST",
+							"additionalHeaders": {
+								"value": "Authorization:Bearer @{activity('Get_Access_Token_DB').output.firstRow.AccessToken}\nContent-Type:@{activity('Get Service Config').output.firstRow.ContentType}\nsoapAction:@{activity('Get Service Config').output.firstRow.SoapAction}",
+								"type": "Expression"
+							},
+							"requestBody": {
+								"value": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<soap:Envelope xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n    <soap:Body>\n        <GetOutboundMessages xmlns=\"urn:microsoft-dynamics-schemas/codeunit/MessageMgmt\">\n          <messageXML></messageXML>\n        </GetOutboundMessages>\n    </soap:Body>\n</soap:Envelope>",
+								"type": "Expression"
+							},
+							"requestTimeout": ""
+						},
+						"formatSettings": {
+							"type": "XmlReadSettings",
+							"validationMode": "none",
+							"namespaces": true
+						}
+					},
+					"dataset": {
+						"referenceName": "Http_BC_WebService",
+						"type": "DatasetReference",
+						"parameters": {
+							"RelUrl": {
+								"value": "@activity('Get Service Config').output.firstRow.RelativeURL",
+								"type": "Expression"
+							}
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Check If Record Is Array",
+				"description": "if record is array -> pass value as it is\nelse -> create array of that single record \n            and pass ",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Get Messages From BC",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@startswith(string(json(xml(replace(string(xml(activity('Get Messages From BC').output.value[0])), ':', ''))).Envelope.Body.GetOutboundMessages_Result.messageXML.MessageAcknowledgement),'[')",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Create Array For One Record",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "MessageAcknowledgement",
+								"value": {
+									"value": "@createArray(json(xml(replace(string(xml(activity('Get Messages From BC').output.value[0])), ':', ''))).Envelope.Body.GetOutboundMessages_Result.messageXML.MessageAcknowledgement)",
+									"type": "Expression"
+								}
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Send Array As It Is",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "MessageAcknowledgement",
+								"value": {
+									"value": "@json(xml(replace(string(xml(activity('Get Messages From BC').output.value[0])), ':', ''))).Envelope.Body.GetOutboundMessages_Result.messageXML.MessageAcknowledgement",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Filter Empty Record",
+				"description": "Check If empty record exists in MessageAcknowledgement \nthen FilteredMessageAcknowledgement will be empty otherwise it will be filled",
+				"type": "Filter",
+				"dependsOn": [
+					{
+						"activity": "Check If Record Is Array",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@variables('MessageAcknowledgement')",
+						"type": "Expression"
+					},
+					"condition": {
+						"value": "@not(equals(variables('MessageAcknowledgement')[0].Id,'0'))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set FilteredEmptyMessageAcknowledgement",
+				"description": "Fill the FilteredMessageAcknowledgement  Array after filtering the record",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Filter Empty Record",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "FilteredEmptyMessageAcknowledgement",
+					"value": {
+						"value": "@activity('Filter Empty Record').output.value",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Get Service Config",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[dbo].[Get_Service_Configuration]",
+						"storedProcedureParameters": {
+							"ServiceCode": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.ServiceCode",
+									"type": "Expression"
+								}
+							},
+							"SiteCode": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.SiteCode",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "Tab_BC_Outb_Doc_Response",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "Get_Access_Token_DB",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT * FROM DEX_Oauth_Access_Token",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "Tab_DEX_Oauth_Access_Token",
+						"type": "DatasetReference"
+					}
+				}
+			},
+			{
+				"name": "If Condition1",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Set FilteredEmptyMessageAcknowledgement",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@{not(empty(variables('FilteredEmptyMessageAcknowledgement')))}",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "Filter Conf Orders",
+							"description": "Get only Ecom Files",
+							"type": "Filter",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"items": {
+									"value": "@variables('FilteredEmptyMessageAcknowledgement')",
+									"type": "Expression"
+								},
+								"condition": {
+									"value": "@not(\n        or(\n            or(equals(item().MessageType,'ILG Sale Order'),equals(item().MessageType,'ILG Purchase Order')),\n            equals(item().MessageType,'Master Data')\n          )\n    )",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set FilteredMessageAcknowledgement",
+							"description": "Fill the FilteredMessageAcknowledgement  Array after filtering the record",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Filter Conf Orders",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "FilteredMessageAcknowledgement",
+								"value": {
+									"value": "@activity('Filter Conf Orders').output.value",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "For Each Message Acknowledgement",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "If Condition1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@variables('FilteredMessageAcknowledgement')",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Update BC Response_Default",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[dbo].[Load_BC_Outbound_Document_Response_ILG]",
+									"storedProcedureParameters": {
+										"BCMessageID": {
+											"type": "Int32",
+											"value": {
+												"value": "@{item().Id}",
+												"type": "Expression"
+											}
+										},
+										"Direction": {
+											"type": "String",
+											"value": {
+												"value": "@{item().Direction}",
+												"type": "Expression"
+											}
+										},
+										"MessageType": {
+											"type": "String",
+											"value": {
+												"value": "@{item().MessageType}",
+												"type": "Expression"
+											}
+										},
+										"PayLoad": {
+											"type": "String",
+											"value": {
+												"value": "@{item().Payload}",
+												"type": "Expression"
+											}
+										},
+										"SiteCode": {
+											"type": "String",
+											"value": {
+												"value": "@{item().SiteCode}",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "Tab_BC_Outb_Doc_Response",
+									"type": "DatasetReference"
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "Load BC Outbound Data XML ILG",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Update BC Response_Default",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[Load BC Outbound Data XML ILG]",
+								"storedProcedureParameters": {
+									"BCMessageID": {
+										"value": {
+											"value": "@activity('Update BC Response_Default').output.firstRow.BCMessageID",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "DEXInterfaceProd",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"ServiceCode": {
+				"type": "string",
+				"defaultValue": "GetOutboundMessages"
+			},
+			"SiteCode": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"MessageAcknowledgement": {
+				"type": "Array"
+			},
+			"FilteredEmptyMessageAcknowledgement": {
+				"type": "Array"
+			},
+			"FilteredMessageAcknowledgement": {
+				"type": "Array"
+			}
+		},
+		"folder": {
+			"name": "Ecom"
+		},
+		"annotations": [],
+		"lastPublishTime": "2021-08-16T06:42:09Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

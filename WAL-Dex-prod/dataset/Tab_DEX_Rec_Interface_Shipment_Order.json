@@ -1,0 +1,35 @@
+{
+	"name": "Tab_DEX_Rec_Interface_Shipment_Order",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "DEXInterfaceProd",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "ID",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "MessageID",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "SiteCode",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Order_Number",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "DEX_Rec_Interface_Shipment_Order"
+		}
+	}
+}

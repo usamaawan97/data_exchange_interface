@@ -1,0 +1,321 @@
+{
+	"name": "Send_Rec_File_To_BS",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Site Codes",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 5,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT distinct SiteCode \nfrom DEX_Rec_Interface_Document",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "Tab_DEX_Site_Config",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach SiteCode",
+				"description": "Get Shipment XML Of the day for each site",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Site Codes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Site Codes').output.value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Get Recon XML",
+							"description": "Get One Recon XML From DB By Combining all XMLs of day",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[dbo].[Get_Recon_File]",
+									"storedProcedureParameters": {
+										"SiteCode": {
+											"type": "String",
+											"value": {
+												"value": "@item().SiteCode",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "Tab_DEX_Site_Config",
+									"type": "DatasetReference"
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "Save Recon XML",
+							"description": "Insert that one XML in DB",
+							"type": "Lookup",
+							"dependsOn": [
+								{
+									"activity": "Get Recon XML",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[dbo].[Load_Recon_Files]",
+									"storedProcedureParameters": {
+										"Direction": {
+											"type": "String",
+											"value": "Outbound"
+										},
+										"ReconXML": {
+											"type": "String",
+											"value": {
+												"value": "@activity('Get Recon XML').output.firstRow.ReconXML",
+												"type": "Expression"
+											}
+										},
+										"SiteCode": {
+											"type": "String",
+											"value": {
+												"value": "@item().SiteCode",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "Tab_Dex_Interface_Document",
+									"type": "DatasetReference"
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "Get Saved Recon XML Details",
+							"description": "To Get MessageType and other details of saved Recon XML Record",
+							"type": "Lookup",
+							"dependsOn": [
+								{
+									"activity": "Save Recon XML",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "SELECT MessageType \nFROM DEX_Interface_Document \nWHERE MessageID = @{activity('Save Recon XML').output.firstRow.NewFileID}",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "Tab_Dex_Interface_Document",
+									"type": "DatasetReference"
+								},
+								"firstRowOnly": true
+							}
+						},
+						{
+							"name": "Create File From DB to Blob",
+							"description": "Create XML File of Recon XML and save in Blob Storage ",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Get Saved Recon XML Details",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[dbo].[Get_OutBound_Msg_Detail]",
+									"storedProcedureParameters": {
+										"MessageID": {
+											"type": "Int32",
+											"value": {
+												"value": "@{activity('Save Recon XML').output.firstRow.NewFileID}",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"mappings": [
+										{
+											"source": {
+												"name": "FileData",
+												"type": "String",
+												"physicalType": "nvarchar"
+											},
+											"sink": {
+												"type": "String",
+												"physicalType": "String",
+												"ordinal": 1
+											}
+										}
+									],
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "Tab_BC_Inb_Docs",
+									"type": "DatasetReference"
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "Storage_Save_OB_File_In_Blob",
+									"type": "DatasetReference",
+									"parameters": {
+										"SiteCode": {
+											"value": "@{item().SiteCode}",
+											"type": "Expression"
+										},
+										"MessageType": {
+											"value": "@{activity('Get Saved Recon XML Details').output.firstRow.MessageType}",
+											"type": "Expression"
+										},
+										"MessageId": {
+											"value": "@{activity('Save Recon XML').output.firstRow.NewFileID}",
+											"type": "Expression"
+										},
+										"Container": "obrecdrop"
+									}
+								}
+							]
+						},
+						{
+							"name": "Update Exported Messages",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Create File From DB to Blob",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 5,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[Update_Exported_Message]",
+								"storedProcedureParameters": {
+									"MessageID": {
+										"value": {
+											"value": "@{activity('Save Recon XML').output.firstRow.NewFileID}",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "DEXInterfaceProd",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			}
+		],
+		"folder": {
+			"name": "Reconciliation"
+		},
+		"annotations": []
+	}
+}

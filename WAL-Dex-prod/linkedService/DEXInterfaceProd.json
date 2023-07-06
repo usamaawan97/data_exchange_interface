@@ -1,0 +1,17 @@
+{
+	"name": "DEXInterfaceProd",
+	"properties": {
+		"annotations": [],
+		"type": "AzureSqlDatabase",
+		"typeProperties": {
+			"connectionString": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "kvDEXProd",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "SQL-Database-Connection-String"
+			}
+		}
+	}
+}

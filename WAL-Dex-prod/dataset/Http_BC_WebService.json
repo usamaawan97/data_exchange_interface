@@ -1,0 +1,26 @@
+{
+	"name": "Http_BC_WebService",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "Http_BC_Service",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"RelUrl": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Xml",
+		"typeProperties": {
+			"location": {
+				"type": "HttpServerLocation",
+				"relativeUrl": {
+					"value": "@dataset().RelUrl",
+					"type": "Expression"
+				}
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
